@@ -1,10 +1,61 @@
 #ifndef DJOEZEKE_TOMLFY_H
 #define DJOEZEKE_TOMLFY_H
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 
-#pragma region Tomlfy DEF
+#define TOMLFY_VERSION_MAJOR 0
+#define TOMLFY_VERSION_MINOR 1
+#define TOMLFY_VERSION_PATCH 0
+
+#define TOMLFY_VERSION v##TOMLFY_VERSION_MAJOR##.##TOMLFY_VERSION_MINOR##.##TOMLFY_VERSION_PATCH
+
+#define TOMLFY_CONCAT(x, y) x##y
+#define TOMLFY_UNIQUE_NAME(prefix) TOMLFY_CONCAT(prefix, __COUNTER__)
+
+#define TOMLFY_DEBUG
+
+#ifdef TOMLFY_DEBUG
+#endif // TOMLFY_DEBUG
+
+/**
+ * @brief Macro to convert an error value to its string representation.
+ *
+ * This macro is used in a switch-case statement to return the string representation
+ * of an error value.
+ *
+ * @param value The error value to convert to a string.
+ */
+#define CASEFY_ERROR(value) \
+    case value:             \
+        return #value;
+
+typedef struct Toml Toml;
+
+#pragma region STRUCTURES
+
+enum TomlError
+{
+    UNKNOWN = -1,
+
+    NO_SEPARATOR,
+    MISSING_VALUE,
+
+    EMPTY_FIELD,
+
+    INVALID_FIELD, // if filed doesnt exits
+    INVALID_ROW,
+
+    INVALID_FILE, // if
+    NULL_FILE,    // if pointer is null
+    FILE_ERROR,
+
+    VALUE_NULL,
+    WRONG_CAST
+};
+
 // Define TOML value types
 typedef enum
 {
@@ -17,7 +68,6 @@ typedef enum
 } TomlType;
 
 // Forward declaration of Toml
-typedef struct Toml Toml;
 
 // Define a TOML key-value pair for tables
 typedef struct
@@ -49,52 +99,130 @@ struct Toml
     } data;
 };
 
-#pragma endregion // Tomlfy DEF
+#pragma endregion // STRUCTURES
 
-#pragma region Tomlfy IMP
+#pragma region DECLARATIONS
+
+TomlKeyValuePair tomlfy_create_keyvalue(char *key, Toml *value);
+void tomlfy_free_keyvalue(TomlKeyValuePair *keyvalue);
+
 // Function to create a TOML string value
-Toml *tomlfy_create_string(const char *string_value)
+Toml tomlfy_create_string(const char *string_value);
+char *tomlfy_get_string(Toml *value);
+void tomlfy_free_string(Toml *value);
+
+// Function to create a TOML integer value
+Toml tomlfy_create_integer(int int_value);
+int tomlfy_get_integer(Toml *value);
+void tomlfy_free_integer(Toml *value);
+
+// Function to create a TOML float value
+Toml tomlfy_create_float(double float_value);
+double tomlfy_get_float(Toml *value);
+void tomlfy_free_float(Toml *value);
+
+// Function to create a TOML boolean value
+Toml tomlfy_create_boolean(int bool_value);
+int tomlfy_get_boolean(Toml *value);
+void tomlfy_free_boolean(Toml *value);
+
+// Function to create a TOML array value
+Toml tomlfy_create_array();
+void tomlfy_free_array(Toml *value);
+void tomlfy_array_add(Toml *table, Toml *value);
+void tomlfy_array_del(Toml *table, int index);
+Toml tomlfy_array_get(Toml *table, int index);
+
+// Function to create a TOML table value
+Toml tomlfy_create_table();
+void tomlfy_free_table(Toml *value);
+void tomlfy_table_add(Toml *table, const char *key, Toml *value);
+void tomlfy_table_del(Toml *table, const char *key);
+Toml tomlfy_table_get(Toml *table, const char *key);
+
+// Function to print a TOML value (for demonstration purposes)
+void tomlfy_print(Toml *value, int indent);
+
+Toml tomlfy_read_from_file(const char *filename);
+bool tomlfy_write_to_file(const Toml *toml, const char *filename);
+
+// Function to free a TOML value
+void tomlfy_free(Toml *value);
+
+void tomlfy_error(TomlError error, const char *format = NULL, ...);
+const char *tomlfy_error_name(TomlError error);
+
+#pragma endregion // DECLARATIONS
+
+#pragma region DEFINATIONS
+
+TomlKeyValuePair tomlfy_create_keyvalue(char *key, Toml *value)
 {
-    Toml *value = (Toml *)malloc(sizeof(Toml));
-    value->type = TOML_STRING;
-    value->data.string_value = strdup(string_value);
+    TomlKeyValuePair keyvalue;
+    keyvalue.key = strdup(key);
+    keyvalue.value = value;
+    return keyvalue;
+};
+
+void tomlfy_free_keyvalue(TomlKeyValuePair *keyvalue)
+{
+    if (keyvalue == NULL)
+    {
+#ifdef TOMLFY_DEBUG
+        tomlfy_error(VALUE_NULL, "Can't free null key value");
+#endif // TOMLFY_DEBUG
+    }
+    else
+    {
+        free(keyvalue->key);
+        tomlfy_free(keyvalue->value);
+    }
+    return;
+};
+
+// Function to create a TOML string value
+Toml tomlfy_create_string(const char *string_value)
+{
+    Toml value;
+    value.type = TOML_STRING;
+    value.data.string_value = strdup(string_value);
     return value;
 }
 
 // Function to create a TOML integer value
-Toml *tomlfy_create_integer(int int_value)
+Toml tomlfy_create_integer(int int_value)
 {
-    Toml *value = (Toml *)malloc(sizeof(Toml));
-    value->type = TOML_INTEGER;
-    value->data.int_value = int_value;
+    Toml value;
+    value.type = TOML_INTEGER;
+    value.data.int_value = int_value;
     return value;
 }
 
 // Function to create a TOML float value
-Toml *tomlfy_create_float(double float_value)
+Toml tomlfy_create_float(double float_value)
 {
-    Toml *value = (Toml *)malloc(sizeof(Toml));
-    value->type = TOML_FLOAT;
-    value->data.float_value = float_value;
+    Toml value;
+    value.type = TOML_FLOAT;
+    value.data.float_value = float_value;
     return value;
 }
 
 // Function to create a TOML boolean value
-Toml *tomlfy_create_boolean(int bool_value)
+Toml tomlfy_create_boolean(int bool_value)
 {
-    Toml *value = (Toml *)malloc(sizeof(Toml));
-    value->type = TOML_BOOLEAN;
-    value->data.bool_value = bool_value;
+    Toml value;
+    value.type = TOML_BOOLEAN;
+    value.data.bool_value = bool_value;
     return value;
 }
 
 // Function to create a TOML array value
-Toml *tomlfy_create_array()
+Toml tomlfy_create_array()
 {
-    Toml *value = (Toml *)malloc(sizeof(Toml));
-    value->type = TOML_ARRAY;
-    value->data.array_value.items = NULL;
-    value->data.array_value.size = 0;
+    Toml value;
+    value.type = TOML_ARRAY;
+    value.data.array_value.items = NULL;
+    value.data.array_value.size = 0;
     return value;
 }
 
@@ -109,12 +237,12 @@ void tomlfy_array_add(Toml *array, Toml *item)
 }
 
 // Function to create a TOML table value
-Toml *tomlfy_create_table()
+Toml tomlfy_create_table()
 {
-    Toml *value = (Toml *)malloc(sizeof(Toml));
-    value->type = TOML_TABLE;
-    value->data.table_value.items = NULL;
-    value->data.table_value.size = 0;
+    Toml value;
+    value.type = TOML_TABLE;
+    value.data.table_value.items = NULL;
+    value.data.table_value.size = 0;
     return value;
 }
 
@@ -181,26 +309,26 @@ void tomlfy_free(Toml *value)
 {
     if (!value)
         return;
+
     switch (value->type)
     {
+    case TOML_FLOAT:
+        tomlfy_free_float(value);
+        break;
+    case TOML_INTEGER:
+        tomlfy_free_integer(value);
+        break;
+    case TOML_BOOLEAN:
+        tomlfy_free_boolean(value);
+        break;
     case TOML_STRING:
-        free(value->data.string_value);
+        tomlfy_free_string(value);
         break;
     case TOML_ARRAY:
-        for (size_t i = 0; i < value->data.array_value.size; i++)
-        {
-            tomlfy_free(value->data.array_value.items[i]);
-        }
-        free(value->data.array_value.items);
+        tomlfy_free_array(value);
         break;
     case TOML_TABLE:
-        for (size_t i = 0; i < value->data.table_value.size; i++)
-        {
-            free(value->data.table_value.items[i]->key);
-            tomlfy_free(value->data.table_value.items[i]->value);
-            free(value->data.table_value.items[i]);
-        }
-        free(value->data.table_value.items);
+        tomlfy_free_table(value);
         break;
     default:
         break;
@@ -208,6 +336,137 @@ void tomlfy_free(Toml *value)
     free(value);
 }
 
-#pragma endregion // Tomlfy IMP
+void tomlfy_free_string(Toml *value)
+{
+    if (value == NULL)
+    {
+#ifdef TOMLFY_DEBUG
+        tomlfy_error(VALUE_NULL, "Can't free null value");
+#endif // TOMLFY_DEBUG
+    }
+    else
+        free(value->data.string_value);
+
+    return;
+};
+
+void tomlfy_free_integer(Toml *value)
+{
+#ifdef TOMLFY_DEBUG
+
+    if (value == NULL)
+    {
+        tomlfy_error(VALUE_NULL, "Can't free null value");
+    }
+#endif // TOMLFY_DEBUG
+    return;
+};
+
+void tomlfy_free_float(Toml *value)
+{
+#ifdef TOMLFY_DEBUG
+
+    if (value == NULL)
+    {
+        tomlfy_error(VALUE_NULL, "Can't free null value");
+    }
+#endif // TOMLFY_DEBUG
+    return;
+};
+
+void tomlfy_free_boolean(Toml *value)
+{
+#ifdef TOMLFY_DEBUG
+
+    if (value == NULL)
+    {
+        tomlfy_error(VALUE_NULL, "Can't free null value");
+    }
+#endif // TOMLFY_DEBUG
+    return;
+};
+
+void tomlfy_free_array(Toml *value)
+{
+    if (value == NULL)
+    {
+#ifdef TOMLFY_DEBUG
+        tomlfy_error(VALUE_NULL, "Can't free null value");
+#endif // TOMLFY_DEBUG
+    }
+    else
+    {
+        for (size_t i = 0; i < value->data.array_value.size; i++)
+        {
+            free(value->data.array_value.items[i]);
+        }
+        free(value->data.array_value.items);
+    }
+    return;
+};
+
+void tomlfy_free_table(Toml *value)
+{
+    if (value == NULL)
+    {
+#ifdef TOMLFY_DEBUG
+        tomlfy_error(VALUE_NULL, "Can't free null value");
+#endif // TOMLFY_DEBUG
+    }
+    else
+    {
+        for (size_t i = 0; i < value->data.table_value.size; i++)
+        {
+            free(value->data.table_value.items[i]->key);
+            tomlfy_free(value->data.table_value.items[i]->value);
+            free(value->data.table_value.items[i]);
+        }
+        free(value->data.table_value.items);
+    }
+    return;
+};
+
+void tomlfy_error(TomlError error, const char *format, ...)
+{
+
+    if (format == NULL)
+        fprintf(stderr, "TOMLFY [%i] : %s \n", error, tomlfy_error_name(error));
+    else
+    {
+        va_list args;
+
+        va_start(args, format);
+
+        fprintf(stderr, "TOMLFY [%i] :", error);
+        vprintf(format, args);
+        // Clean up the argument list
+        va_end(args);
+    }
+};
+
+const char *tomlfy_error_name(TomlError error)
+{
+    switch (error)
+    {
+        CASEFY_ERROR(UNKNOWN);
+
+        CASEFY_ERROR(NO_SEPARATOR);
+        CASEFY_ERROR(MISSING_VALUE);
+
+        CASEFY_ERROR(EMPTY_FIELD);
+
+        CASEFY_ERROR(INVALID_FIELD);
+        CASEFY_ERROR(INVALID_ROW);
+
+        CASEFY_ERROR(INVALID_FILE);
+        CASEFY_ERROR(NULL_FILE);
+        CASEFY_ERROR(FILE_ERROR);
+
+        CASEFY_ERROR(VALUE_NULL);
+
+        CASEFY_ERROR(WRONG_CAST);
+    }
+};
+#pragma endregion // DEFINATIONS
 
 #endif // DJOEZEKE_TOMLFY_H
