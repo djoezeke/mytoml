@@ -50,6 +50,11 @@
 #ifndef DJOEZEKE_MYTOML_H
 #define DJOEZEKE_MYTOML_H
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif //__cplusplus
+
 /**
  * @defgroup version Version Information
  * @{
@@ -79,11 +84,11 @@
  */
 #define MYTOML_VERSION "0.1.0"
 
-/** @} */
+    /** @} */
 
-//-----------------------------------------------------------------------------
-// [SECTION] Mytoml Header mess
-//-----------------------------------------------------------------------------
+    //-----------------------------------------------------------------------------
+    // [SECTION] Mytoml Header mess
+    //-----------------------------------------------------------------------------
 
 #include <time.h>    //
 #include <math.h>    //
@@ -113,14 +118,14 @@
 #ifdef MYTOML_TESTS
 #endif // MYTOML_TESTS
 
-//-----------------------------------------------------------------------------
-// [SECTION] Mytoml Import/Export
-//-----------------------------------------------------------------------------
+    //-----------------------------------------------------------------------------
+    // [SECTION] Mytoml Import/Export
+    //-----------------------------------------------------------------------------
 
-/**
- * @defgroup export Export Definitions
- * @{
- */
+    /**
+     * @defgroup export Export Definitions
+     * @{
+     */
 
 #if defined(_WIN32)
 #define MYTOML_API_EXPORT __declspec(dllexport)
@@ -130,7 +135,7 @@
 #define MYTOML_API_IMPORT __attribute__((visibility("default")))
 #endif // _WIN32
 
-/** The public API declaration. */
+    /** The public API declaration. */
 
 #if defined(MYTOML_BUILD_STATIC)
 #define MYTOML_API
@@ -142,252 +147,281 @@
 #define MYTOML_API
 #endif // MYTOML_BUILD_STATIC
 
-/** @} */
+    /** @} */
 
-//-----------------------------------------------------------------------------
-// [SECTION] Mytoml Data Structures
-//-----------------------------------------------------------------------------
-
-/**
- * @defgroup basic Basic Types
- * @{
- */
-
-/*
-    Enum `TomlValueType` represents the set of value
-    types accepted by this TOML parser. This corresponds
-    to the various types defined in the TOML Spec.
-*/
-typedef enum TomlValueType_t
-{
+    //-----------------------------------------------------------------------------
+    // [SECTION] Mytoml Data Structures
+    //-----------------------------------------------------------------------------
 
     /**
-     * @name Toml value types
+     * @defgroup basic Basic Types
      * @{
      */
 
-    TOML_INT,           /** A number value type (integer). */
-    TOML_BOOL,          /** A boolean value type. */
-    TOML_FLOAT,         /** A number value type (floating-point).*/
-    TOML_ARRAY,         /** A array value type. */
-    TOML_STRING,        /** A string value type. */
-    TOML_DATETIME,      /** A datetime value type. */
-    TOML_DATELOCAL,     /** A datelocal value type. */
-    TOML_TIMELOCAL,     /** A timelocal value type. */
-    TOML_INLINETABLE,   /** A table value type. */
-    TOML_DATETIMELOCAL, /** A datetime local value type. */
+    /*
+        Enum `TomlValueType` represents the set of value
+        types accepted by this TOML parser. This corresponds
+        to the various types defined in the TOML Spec.
+    */
+    typedef enum TomlValueType_t
+    {
 
-    /** @} */
+        /**
+         * @name Toml value types
+         * @{
+         */
 
-} TomlValueType;
+        TOML_INT,           /** A number value type (integer). */
+        TOML_BOOL,          /** A boolean value type. */
+        TOML_FLOAT,         /** A number value type (floating-point).*/
+        TOML_ARRAY,         /** A array value type. */
+        TOML_STRING,        /** A string value type. */
+        TOML_DATETIME,      /** A datetime value type. */
+        TOML_DATELOCAL,     /** A datelocal value type. */
+        TOML_TIMELOCAL,     /** A timelocal value type. */
+        TOML_INLINETABLE,   /** A table value type. */
+        TOML_DATETIMELOCAL, /** A datetime local value type. */
 
-/*
-    Enum `TomlKeyType` represents the various types of
-    keys that this TOML parser is aware of. It is used
-    to make re-defining validity decisions.
-*/
-typedef enum TomlKeyType_t
-{
+        /** @} */
+
+    } TomlValueType;
+
+    /*
+        Enum `TomlKeyType` represents the various types of
+        keys that this TOML parser is aware of. It is used
+        to make re-defining validity decisions.
+    */
+    typedef enum TomlKeyType_t
+    {
+        /**
+         * @name Toml key types
+         * @{
+         */
+
+        TOML_KEY,        /** `j.k = v` -> j */
+        TOML_TABLE,      /** `[a.b]` -> a */
+        TOML_KEYLEAF,    /** `j.k = v` -> k */
+        TOML_TABLELEAF,  /** `[a.b]` -> b */
+        TOML_ARRAYTABLE, /** `[[t]]` -> t */
+
+        /** @} */
+
+    } TomlKeyType;
+
+    typedef enum TomlErrorType_t
+    {
+
+        /**
+         * @name Toml error types
+         * @{
+         */
+
+        TOML_UNKNOWN, /** An unknown error type. */
+
+        /** @} */
+
+    } TomlErrorType;
+
     /**
-     * @name Toml key types
+     * @name TomlValue data type
      * @{
      */
 
-    TOML_KEY,        /** `j.k = v` -> j */
-    TOML_TABLE,      /** `[a.b]` -> a */
-    TOML_KEYLEAF,    /** `j.k = v` -> k */
-    TOML_TABLELEAF,  /** `[a.b]` -> b */
-    TOML_ARRAYTABLE, /** `[[t]]` -> t */
+    /*
+        Struct `TomlValue` holds the various attributes
+        associated with a TOML value.
+    */
+    typedef struct TomlValue_t TomlValue;
+    struct TomlValue_t
+    {
+        TomlValueType type;                /** the type of TOML value */
+        TomlValue **arr;                   /** used for storing `ARRAY` type values */
+        int len;                           /**  */
+        void *data;                        /** used for storing non-`ARRAY` type values */
+        int precision;                     /** used for printing numeric values */
+        bool scientific;                   /** used for printing numeric values */
+        char format[TOML_MAX_DATE_FORMAT]; /** used for printing datetime values */
+    };
 
     /** @} */
 
-} TomlKeyType;
-
-typedef enum TomlErrorType_t
-{
-
     /**
-     * @name Toml error types
+     * @name TomlKey data type
      * @{
      */
 
-    TOML_UNKNOWN, /** An unknown error type. */
+    /*
+        Struct `TomlKey` defines the TOML keys. Each node in
+        the parsed AST is a `key`, irrespective of the fact
+        if they were defined as TOML keys or tables.
+    */
+    typedef struct TomlKey_t TomlKey;
+    KHASH_MAP_INIT_STR(str, TomlKey *)
+    struct TomlKey_t
+    {
+        TomlKeyType type;            /** key type as described above */
+        char id[TOML_MAX_ID_LENGTH]; /** identifier */
+        khash_t(str) * subkeys;      /** map of subkeys */
+        TomlValue *value;            /** value associated with this key */
+        int idx;                     /** used for indexing ARRAYTABLES */
+    };
 
     /** @} */
 
-} TomlErrorType;
+    /**
+     * @name TomlError data type
+     * @{
+     */
 
-/**
- * @name TomlValue data type
- * @{
- */
+    typedef struct TomlError_t TomlError;
+    struct TomlError_t
+    {
+        TomlKeyType type;    /** type of error*/
+        const char *message; /** */
+    };
 
-/*
-    Struct `TomlValue` holds the various attributes
-    associated with a TOML value.
-*/
-typedef struct TomlValue_t TomlValue;
-struct TomlValue_t
-{
-    TomlValueType type;                /** the type of TOML value */
-    TomlValue **arr;                   /** used for storing `ARRAY` type values */
-    int len;                           /**  */
-    void *data;                        /** used for storing non-`ARRAY` type values */
-    int precision;                     /** used for printing numeric values */
-    bool scientific;                   /** used for printing numeric values */
-    char format[TOML_MAX_DATE_FORMAT]; /** used for printing datetime values */
-};
+    /** @} */
 
-/** @} */
-
-/**
- * @name TomlKey data type
- * @{
- */
-
-/*
-    Struct `TomlKey` defines the TOML keys. Each node in
-    the parsed AST is a `key`, irrespective of the fact
-    if they were defined as TOML keys or tables.
-*/
-typedef struct TomlKey_t TomlKey;
-KHASH_MAP_INIT_STR(str, TomlKey *)
-struct TomlKey_t
-{
-    TomlKeyType type;            /** key type as described above */
-    char id[TOML_MAX_ID_LENGTH]; /** identifier */
-    khash_t(str) * subkeys;      /** map of subkeys */
-    TomlValue *value;            /** value associated with this key */
-    int idx;                     /** used for indexing ARRAYTABLES */
-};
-
-/** @} */
-
-/**
- * @name TomlError data type
- * @{
- */
-
-typedef struct TomlError_t TomlError;
-struct TomlError_t
-{
-    TomlKeyType type;    /** type of error*/
-    const char *message; /** */
-};
-
-/** @} */
-
-/** @} */
+    /** @} */
 
 #ifdef __cplusplus
-extern "C"
-{
-#endif //__cplusplus
 
     //-----------------------------------------------------------------------------
     // [SECTION] MyToml C++ Only
     //-----------------------------------------------------------------------------
 
+#endif //__cplusplus
+
+    //-----------------------------------------------------------------------------
+    // [SECTION] MyToml C Only
+    //-----------------------------------------------------------------------------
+
+    /**
+     * @name Mytoml
+     * C Functions
+     * @{
+     */
+
+    /**
+     * @brief Load a toml file or stdin.
+     *
+     * @code
+     *  #include <mytoml.h>
+     *
+     *  int main(int argc, char *argv[])
+     *  {
+     *      TomlKey *toml = tomlLoad("basic.toml");
+     *      if (toml == NULL)
+     *          return 1;
+     *
+     *      tomlFree(toml);
+     *      return 0;
+     *  }
+     * @endcode
+     *
+     * @param[in,out]   file  A file pointer.
+     * @returns the `TomlKey` object or @c NULL if failed to from load file or `stdin`.
+     */
+    MYTOML_API TomlKey *tomlLoad(char *file);
+    MYTOML_API TomlKey *tomlLoadFile(char *file);
+    MYTOML_API TomlKey *tomlLoadFILE(FILE *file);
+
+    /**
+     * @brief Load a toml string or filename.
+     *
+     * @code
+     *  #include <mytoml.h>
+     *
+     *  int main(int argc, char *argv[])
+     *  {
+     *      char* object = ""
+     *      TomlKey *toml = tomlLoads(object);
+     *      if (toml == NULL)
+     *          return 1;
+     *
+     *      tomlFree(toml);
+     *      return 0;
+     *  }
+     * @endcode
+     *
+     * @param[in,out]  toml  A toml string or filename.
+     * @returns the `TomlKey` object or @c NULL if failed to from `string` or file.
+     */
+    MYTOML_API TomlKey *tomlLoads(const char *toml);
+
+    // TODO : Implement method and  Generic call.
+    /**
+     * @brief Load a toml string or filename.
+     *
+     * @code
+     *  #include <mytoml.h>
+     *
+     *  int main(int argc, char *argv[])
+     *  {
+     *      TomlKey *toml = tomlLoad("basic.toml");
+     *      if (toml == NULL)
+     *          return 1;
+     *
+     *      tomlDump(toml,"simple.toml")
+     *      tomlFree(toml);
+     *      return 0;
+     *  }
+     * @endcode
+     *
+     * @param[in,out]  toml  A toml string or filename.
+     * @returns the `TomlKey` object or @c NULL if failed to from `string` or file.
+     */
+    // tomlDump(key_or_value, file_or_FILE);
+    MYTOML_API void tomlKeyDumpFILE(TomlKey *object, FILE *file);
+    MYTOML_API void tomlKeyDumpFile(TomlKey *object, const char *file);
+    MYTOML_API void tomlValueDumpFILE(TomlValue *object, FILE *file);
+    MYTOML_API void tomlValueDumpFile(TomlValue *object, const char *file);
+
+    MYTOML_API const char *tomlKeyDumps(TomlKey *k);
+    MYTOML_API const char *tomlValueDumps(TomlValue *v);
+
+    MYTOML_API void tomlKeyDumpBuffer(TomlKey *k, char **buffer, size_t *size);
+    MYTOML_API void tomlValueDumpBuffer(TomlValue *v, char **buffer, size_t *size);
+
+    MYTOML_API void toml_json_dump(TomlKey *root);
+
+    /**
+     * @brief Free any memory allocated for a `TomlKey` object.
+     *
+     * @param[in,out] toml A TomlKey object.
+     */
+    MYTOML_API void tomlFree(TomlKey *toml);
+
+    MYTOML_API int *tomlGetInt(TomlKey *key);
+    MYTOML_API bool *tomlGetBool(TomlKey *key);
+
+    /**
+     * @brief Gets the name of the error type.
+     * @note If the existing `key->id` is not a match, it iterates through the list of `children`.
+     * @param[in]  key The key to get it string value.
+     * @return The a pointer to the first match.
+     * @retval string String value of `TomlKey`.
+     * @retval otherwise it returns NULL.
+     */
+    MYTOML_API char *tomlGetString(TomlKey *key);
+    MYTOML_API double *tomlGetFloat(TomlKey *key);
+    MYTOML_API TomlValue *tomlGetArray(TomlKey *key);
+    MYTOML_API struct tm *tomlGetDatetime(TomlKey *key);
+
+    /**
+     * @brief Tries to return a key based on the argument `id`.
+     * @note If the existing `key->id` is not a match, it iterates through the list of `children`.
+     * @param[in] key The key to get it string value.
+     * @param[in] key The key to get it string value.
+     * @retval pointer first match of `id`.
+     * @retval otherwise it returns NULL.
+     */
+    MYTOML_API TomlKey *tomlGetKey(TomlKey *key, const char *id);
+
+    /** @} */
+
 #ifdef __cplusplus
 }
 #endif //__cplusplus
-
-//-----------------------------------------------------------------------------
-// [SECTION] MyToml C Only
-//-----------------------------------------------------------------------------
-
-/**
- * @name Mytoml
- * C Functions
- * @{
- */
-
-/**
- * @brief Load a toml file or stdin.
- *
- * @code
- *  #include <mytoml.h>
- *
- *  int main(int argc, char *argv[])
- *  {
- *      TomlKey *toml = tomlLoad("basic.toml");
- *      if (toml == NULL)
- *          return 1;
- *
- *      tomlFree(toml);
- *      return 0;
- *  }
- * @endcode
- *
- * @param[in,out]   file  A file pointer.
- * @returns the `TomlKey` object or @c NULL if failed to from load file or `stdin`.
- */
-MYTOML_API TomlKey *tomlLoad(char *file);
-
-/**
- * @brief Load a toml string or filename.
- *
- * @code
- *  #include <mytoml.h>
- *
- *  int main(int argc, char *argv[])
- *  {
- *      char* object = ""
- *      TomlKey *toml = tomlLoads(object);
- *      if (toml == NULL)
- *          return 1;
- *
- *      tomlFree(toml);
- *      return 0;
- *  }
- * @endcode
- *
- * @param[in,out]  toml  A toml string or filename.
- * @returns the `TomlKey` object or @c NULL if failed to from `string` or file.
- */
-MYTOML_API TomlKey *tomlLoads(const char *toml);
-
-MYTOML_API void toml_value_dump(TomlValue *root);
-
-MYTOML_API void toml_json_dump(TomlKey *root);
-
-/**
- * @brief Free any memory allocated for a `TomlKey` object.
- *
- * @param[in,out] toml A TomlKey object.
- */
-MYTOML_API void tomlFree(TomlKey *toml);
-
-MYTOML_API int *tomlGetInt(TomlKey *key);
-
-MYTOML_API bool *tomlGetBool(TomlKey *key);
-
-/**
- * @brief Gets the name of the error type.
- * @note If the existing `key->id` is not a match, it iterates through the list of `children`.
- * @param[in]  key The key to get it string value.
- * @return The a pointer to the first match.
- * @retval string String value of `TomlKey`.
- * @retval otherwise it returns NULL.
- */
-MYTOML_API char *tomlGetString(TomlKey *key);
-
-MYTOML_API double *tomlGetFloat(TomlKey *key);
-
-MYTOML_API TomlValue *tomlGetArray(TomlKey *key);
-
-MYTOML_API struct tm *tomlGetDatetime(TomlKey *key);
-
-/**
- * @brief Tries to return a key based on the argument `id`.
- * @note If the existing `key->id` is not a match, it iterates through the list of `children`.
- * @param[in] key The key to get it string value.
- * @param[in] key The key to get it string value.
- * @retval pointer first match of `id`.
- * @retval otherwise it returns NULL.
- */
-MYTOML_API TomlKey *tomlGetKey(TomlKey *key, const char *id);
-
-/** @} */
 
 #endif // DJOEZEKE_MYTOML_H
