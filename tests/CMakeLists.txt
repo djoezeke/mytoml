@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.16...4.1.1 FATAL_ERROR)
 project(Mytoml-Tests)
 
+#--------------------------------------------------------------------
+# Basic Test Configures   
+#--------------------------------------------------------------------
+
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Debug)
 endif()
@@ -9,7 +13,21 @@ if(WIN32)
   add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 endif()
 
-include_directories(".")
+include_directories("." "../")
+
+set(MYTOML_TEST_LIB_NAME ${MYTOML_LIB_NAME}-d)
+
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+add_library(${MYTOML_TEST_LIB_NAME} ../${MYTOML_SOURCES})
+
+target_include_directories(${MYTOML_TEST_LIB_NAME} 
+    PUBLIC 
+        $<BUILD_INTERFACE:${MYTOML_INCLUDE_BUILD_DIR}>
+)
+
+set_target_properties(${MYTOML_TEST_LIB_NAME} 
+    PROPERTIES DEFINE_SYMBOL MYTOML_BUILD_SHARED
+    )
 
 #--------------------------------------------------------------------
 # Test Functions
@@ -19,6 +37,7 @@ function(add_c_test NAME)
   add_executable(${NAME} ${NAME}.c)
   target_link_libraries(${NAME} PRIVATE ${MYTOML_LIB_NAME})
   set_property(TARGET ${NAME} PROPERTY C_STANDARD 17)
+  set_target_properties(${NAME} PROPERTIES DEFINE_SYMBOL MYTOML_IMPORT)
   add_test(NAME ${NAME} COMMAND ${NAME})
 endfunction()
 
@@ -26,6 +45,7 @@ function(add_cpp_test NAME)
   add_executable(${NAME} ${NAME}.cpp)
   target_link_libraries(${NAME} PRIVATE ${MYTOML_LIB_NAME})
   set_property(TARGET ${NAME} PROPERTY CXX_STANDARD 17)
+  set_target_properties(${NAME} PROPERTIES DEFINE_SYMBOL MYTOML_IMPORT)
   add_test(NAME ${NAME} COMMAND ${NAME})
 endfunction()
 
