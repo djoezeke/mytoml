@@ -4,6 +4,8 @@
 # Usage :
 #		make sample
 #		make clean
+#		make build
+#		make test
 
 CC = gcc
 CCFLAGS = -Wall -Wextra -std=c23 -Wformat -Wempty-body
