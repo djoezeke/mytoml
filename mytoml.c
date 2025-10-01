@@ -14,10 +14,9 @@ extern "C"
     //-----------------------------------------------------------------------------
 
 /**
+ * @def LOG_ERR
  * @brief Macro to log error message to stderr.
- *
  * @note It also specifies which file, line and function the error was raised in.
- *
  */
 #define LOG_ERR(...)                           \
     do                                         \
@@ -28,10 +27,10 @@ extern "C"
     } while (0)
 
 /**
+ * @def RETURN_IF_FAILED
  * @brief Macro to check `COND` and return if it fails.
- *
- * @note returns NULL from the location where it is called.
  * @param COND expression to check.
+ * @note returns NULL from the location where it is called.
  */
 #define RETURN_IF_FAILED(COND, ...) \
     do                              \
@@ -44,11 +43,11 @@ extern "C"
     } while (0)
 
 /**
+ * @def FUNC_IF_FAILED
  * @brief Macro to check `COND` and calls `FUNC` with args if it fails.
- *
- * @note returns NULL from the location where it is called.
  * @param COND expression to check.
  * @param FUNC fuction to call.
+ * @note returns NULL from the location where it is called.
  */
 #define FUNC_IF_FAILED(COND, FUNC, ...) \
     do                                  \
@@ -60,11 +59,11 @@ extern "C"
     } while (0)
 
 /**
+ * @def CHECK_DATETIME
  * @brief Macro to check date and time.
- *
- * @note returns NULL from the location where it is called.
  * @param VAR variable to check.
  * @param LEN expected variable lenght.
+ * @note returns NULL from the location where it is called.
  */
 #define CHECK_DATETIME(VAR, LEN, ...)                      \
     do                                                     \
@@ -75,10 +74,9 @@ extern "C"
     } while (0)
 
 /**
+ * @def CHECK_DATE
  * @brief Macro to check date.
- *
- * This macro is used in check/validate year, month and day.
- *
+ * @note This macro is used in check/validate year, month and day.
  */
 #define CHECK_DATE()                               \
     do                                             \
@@ -92,10 +90,9 @@ extern "C"
     } while (0)
 
 /**
+ * @def CHECK_TIME
  * @brief Macro to check time.
- *
- * This macro is used in check/validate hour, minute and seconds.
- *
+ * @note This macro is used in check/validate hour, minute and seconds.
  */
 #define CHECK_TIME()                                \
     do                                              \
@@ -115,7 +112,8 @@ extern "C"
     //-----------------------------------------------------------------------------
 
     /**
-     * @defgroup tokenizer Tokenizer Definitions
+     * @defgroup Parser Basis Types
+     * @brief Core types and data structures for Parser.
      * @{
      */
 
@@ -130,88 +128,114 @@ extern "C"
         TODO: Refactor to parse tokens instead of characters
     */
 
-    typedef enum InputType_t
+    /**
+     * @enum InputType
+     * @brief Enumerates all TOML input types supported by the parser.
+     * @details Used to distinguish between FILE* , char* file and char* string.
+     */
+    typedef enum InputType
     {
-        /**
-         * @name File Input types
-         * @{
-         */
 
-        I_FILE, /** `FILE *` file input type  */
-        I_File, /** `basic.toml` file input type */
-
-        /** @} */
+        I_FILE,  /**< `FILE *` File input type  */
+        I_File,  /**< `basic.toml` File input type */
+        I_STREAM /**< `char *` Stream input type  */
 
     } InputType;
 
-    typedef struct Input_t Input;
-    struct Input_t
-    {
-        InputType type; /** The file input type. */
-        /** Standard (FILE* or char * file) input. */
-        union
-        {
-            const char *name; /** Filename input. */
-            FILE *pointer;    /** FILE input. */
-        } file;
-
-        char *stream; /**pointer for storing the input buffer */
-    };
-
     /**
-     * The tokenizer structure.
-     *
-     * All members are internal. Manage the structure using the @c yaml_parser_
-     * family of functions.
+     * @name Parser Input type
+     * @{
      */
 
-    typedef struct tokenizer tokenizer_t;
-    struct tokenizer
+    /**
+     * @struct Input
+     * @brief Represents a TOML input for parser.
+     */
+    typedef struct Input
+    {
+        InputType type; /**< The file input type. */
+        /** Standard ( `FILE*` or `char *` file) input. */
+        union
+        {
+            const char *name; /**< The `char*` file input filename. */
+            FILE *pointer;    /**< The `FILE*` file input pointer. */
+        } file;
+
+        char *stream; /**< Pointer for storing the input buffer */
+    } Input;
+
+    /** @} */
+
+    /**
+     * @name Parser Input type
+     * @{
+     */
+
+    /**
+     * @struct Tokenizer
+     * @brief Represents a TOML parser.
+     */
+    typedef struct Tokenizer
     {
         Input input;
-        int cursor;                      /**the location in the input buffer */
-        char token;                      /**the last read in token */
-        char prev;                       /**the token read in before `token` */
-        char prev_prev;                  /**the token read in before `prev` */
-        bool is_null;                    /**boolean to indicate if `token` is non-NULL */
-        bool newline;                    /**keeps track if we are on a newline */
-        int line;                        /**line number in the stream */
-        int col;                         /**column number in the stream */
-        int lines[MYTOML_MAX_NUM_LINES]; /**array where index=line and lines[index]=length */
-    };
+        int cursor;                      /**< The location in the input buffer */
+        char token;                      /**< The last read in token */
+        char prev;                       /**< The token read in before `token` */
+        char prev_prev;                  /**< The token read in before `prev` */
+        bool is_null;                    /**< Boolean to indicate if `token` is non-NULL */
+        bool newline;                    /**< To keep track if we are on a newline */
+        int line;                        /**< The current line number in the stream */
+        int col;                         /**< The current column number in the stream */
+        int lines[MYTOML_MAX_NUM_LINES]; /**, The array where index=line and lines[index]=length */
+    } Tokenizer;
 
-    /*
-        Struct `number` creates a generic type
-        for holding a parsed FLOAT and INT type
-        numbers. It also holds precision for FLOATS
-        which is mostly needed for compliance testing.
-    */
-    typedef struct number number_t;
-    struct number
+    /** @} */
+
+    /**
+     * @name Number data type
+     * @{
+     */
+
+    /**
+     * @struct Number
+     * @brief Represent parsed number values.
+     * It also stores precision and scientific notation flag for floats,
+     * for testing
+     * @note Used for TOML_INT and TOML_FLOAT value types.
+     * @note number can be either integer or floating-point.
+     */
+    typedef struct Number
     {
-        TomlValueType type; /**  */
-        int precision;      /**  */
-        bool scientific;    /**  */
-    };
+        TomlValueType type; /**< */
+        int precision;      /**<  */
+        bool scientific;    /**<  */
+    } Number;
 
-    /*
-        Struct `datetime` creates a generic type
-        for holding parsed DATETIME, DATETIMELOCAL,
-        DATELOCAL and TIMELOCAL values. It also stores
-        the matching format, again for compliance testing.
-    */
-    typedef struct datetime datetime_t;
-    struct datetime
+    /** @} */
+
+    /**
+     * @name Datetime data type
+     * @{
+     */
+
+    /**
+     * @struct Datetime
+     * @brief Represent a generic type for a parsed datetime values.
+     * number can be either integer or floating-point.
+     * It also stores the matching format, again for compliance testing.
+     * @note Used for DATETIME, DATELOCAL, TIMELOCAL and DATETIMELOCAL value types.
+     */
+    typedef struct Datetime
     {
         struct tm *dt;                       /**  */
         TomlValueType type;                  /**  */
         char format[MYTOML_MAX_DATE_FORMAT]; /**  */
         int millis;                          /**  */
-    };
+    } Datetime;
 
-    /**
-     * @}
-     */
+    /** @} */
+
+    /** @} */
 
     //-----------------------------------------------------------------------------
     // [SECTION] MyToml Function Declarations
@@ -238,7 +262,7 @@ extern "C"
      * @param[in,out]  input  An `Input` object.
      * @returns a pointer to a `tokenizer` object.
      */
-    tokenizer_t *_Mytoml_NewTokenizer(Input input);
+    Tokenizer *_Mytoml_NewTokenizer(Input input);
 
     /*
         Function `_Mytoml_TokenizerLoadInput` loads the data from an the input
@@ -246,7 +270,7 @@ extern "C"
         that the input is not too large. Upon any error, it
         returns false and returns true if everything succeeds.
     */
-    bool _Mytoml_TokenizerLoadInput(tokenizer_t *tok);
+    bool _Mytoml_TokenizerLoadInput(Tokenizer *tok);
 
     /*
         Function `_Mytoml_NextTokenizerToken` reads the next character from the
@@ -257,7 +281,7 @@ extern "C"
         a token, i.e. we have not reached EOF, returns 1, else
         returns 0.
     */
-    int _Mytoml_NextTokenizerToken(tokenizer_t *tok);
+    int _Mytoml_NextTokenizerToken(Tokenizer *tok);
 
     /*
         Function `_Mytoml_TokenizerBacktrace` is used to move the `cursor` back in
@@ -272,14 +296,14 @@ extern "C"
         back 2 extra characters and calls `_Mytoml_NextTokenizerToken` twice to
         re-populate them.
     */
-    void _Mytoml_TokenizerBacktrace(tokenizer_t *tok, int count);
+    void _Mytoml_TokenizerBacktrace(Tokenizer *tok, int count);
 
     /*
         Function `_Mytoml_TokenizerHasToken` returns true if the boolean attribute
         is set to true. This should be used callers to query if
         the tokenizer has a non-EOF token waiting to be parsed.
     */
-    bool _Mytoml_TokenizerHasToken(tokenizer_t *tok);
+    bool _Mytoml_TokenizerHasToken(Tokenizer *tok);
 
     /*
         Functions `_Mytoml_TokenizerGetToken`, `_Mytoml_TokenizerGetPrev` and `_Mytoml_TokenizerGetPrevPrev`
@@ -288,18 +312,18 @@ extern "C"
         used by callers to access the tokens read in by the
         tokenizer.
     */
-    char _Mytoml_TokenizerGetToken(tokenizer_t *tok);
+    char _Mytoml_TokenizerGetToken(Tokenizer *tok);
 
-    char _Mytoml_TokenizerGetPrev(tokenizer_t *tok);
+    char _Mytoml_TokenizerGetPrev(Tokenizer *tok);
 
-    char _Mytoml_TokenizerGetPrevPrev(tokenizer_t *tok);
+    char _Mytoml_TokenizerGetPrevPrev(Tokenizer *tok);
 
     /**
      * @brief Free any memory allocated for a `tokenizer` object.
      *
      * @param[in,out]   tok A tokenizer object.
      */
-    void _Mytoml_FreeTokenizer(tokenizer_t *tok);
+    void _Mytoml_FreeTokenizer(Tokenizer *tok);
 
     //-----------------------------------------------------------------------------
     // [SECTION] Myjson Value
@@ -456,11 +480,11 @@ extern "C"
         argument determines which character marks the termination
         of parsing.
     */
-    TomlKey *_Mytoml_ParserBareKey(tokenizer_t *tok, char end, TomlKeyType branch, TomlKeyType leaf);
+    TomlKey *_Mytoml_ParserBareKey(Tokenizer *tok, char end, TomlKeyType branch, TomlKeyType leaf);
 
-    TomlKey *_Mytoml_ParserBAsicQuotedKey(tokenizer_t *tok, char end, TomlKeyType branch, TomlKeyType leaf);
+    TomlKey *_Mytoml_ParserBAsicQuotedKey(Tokenizer *tok, char end, TomlKeyType branch, TomlKeyType leaf);
 
-    TomlKey *_Mytoml_ParserLiteralQuotedKey(tokenizer_t *tok, char end, TomlKeyType branch, TomlKeyType leaf);
+    TomlKey *_Mytoml_ParserLiteralQuotedKey(Tokenizer *tok, char end, TomlKeyType branch, TomlKeyType leaf);
 
     /*
         Functions `_Mytoml_ParseKey`, `_Mytoml_ParseTable` and
@@ -473,11 +497,11 @@ extern "C"
         a delimiter like `.` or `=`. Returns NULL on
         parsing failure.
     */
-    TomlKey *_Mytoml_ParseKey(tokenizer_t *tok, TomlKey *key, bool expecting);
+    TomlKey *_Mytoml_ParseKey(Tokenizer *tok, TomlKey *key, bool expecting);
 
-    TomlKey *_Mytoml_ParseTable(tokenizer_t *tok, TomlKey *key, bool expecting);
+    TomlKey *_Mytoml_ParseTable(Tokenizer *tok, TomlKey *key, bool expecting);
 
-    TomlKey *_Mytoml_ParseArrayTable(tokenizer_t *tok, TomlKey *key, bool expecting);
+    TomlKey *_Mytoml_ParseArrayTable(Tokenizer *tok, TomlKey *key, bool expecting);
 
     /*
         Function `_Mytoml_ParseKeyValue` tries to parse a key
@@ -492,7 +516,7 @@ extern "C"
         pointer to the last table or arraytable it parsed
         and returns `key` if neither.
     */
-    TomlKey *_Mytoml_ParseKeyValue(tokenizer_t *tok, TomlKey *key, TomlKey *root);
+    TomlKey *_Mytoml_ParseKeyValue(Tokenizer *tok, TomlKey *key, TomlKey *root);
 
     //-----------------------------------------------------------------------------
     // [SECTION] Myjson Parser Value
@@ -510,33 +534,33 @@ extern "C"
         was parsed and `_Mytoml_ParseNewline` returns true if a newline
         was successfully parsed.
     */
-    bool _Mytoml_ParseComment(tokenizer_t *tok);
+    bool _Mytoml_ParseComment(Tokenizer *tok);
 
-    void _Mytoml_ParseWhitespace(tokenizer_t *tok);
+    void _Mytoml_ParseWhitespace(Tokenizer *tok);
 
-    bool _Mytoml_ParseNewline(tokenizer_t *tok);
+    bool _Mytoml_ParseNewline(Tokenizer *tok);
 
-    double _Mytoml_ParseBoolean(tokenizer_t *tok);
+    double _Mytoml_ParseBoolean(Tokenizer *tok);
 
-    TomlKey *_Mytoml_ParseInlineTable(tokenizer_t *tok);
+    TomlKey *_Mytoml_ParseInlineTable(Tokenizer *tok);
 
-    int _Mytoml_ParseEscape(tokenizer_t *tok, char *escaped, int len);
+    int _Mytoml_ParseEscape(Tokenizer *tok, char *escaped, int len);
 
-    int _Mytoml_ParseUnicode(tokenizer_t *tok, char *escaped, int len);
+    int _Mytoml_ParseUnicode(Tokenizer *tok, char *escaped, int len);
 
-    char *_Mytoml_ParseBasicString(tokenizer_t *tok, char *value, bool multi);
+    char *_Mytoml_ParseBasicString(Tokenizer *tok, char *value, bool multi);
 
-    char *_Mytoml_ParseLiteralString(tokenizer_t *tok, char *value, bool multi);
+    char *_Mytoml_ParseLiteralString(Tokenizer *tok, char *value, bool multi);
 
-    double _Mytoml_ParseInfNan(tokenizer_t *tok, bool negative);
+    double _Mytoml_ParseInfNan(Tokenizer *tok, bool negative);
 
-    double _Mytoml_ParseBaseUnit(tokenizer_t *tok, int base, char *value, const char *num_end);
+    double _Mytoml_ParseBaseUnit(Tokenizer *tok, int base, char *value, const char *num_end);
 
-    number_t *_Mytoml_ParseNumber(tokenizer_t *tok, char *value, double *d, const char *num_end, number_t *n);
+    Number *_Mytoml_ParseNumber(Tokenizer *tok, char *value, double *d, const char *num_end, Number *n);
 
-    datetime_t *_Mytoml_ParseDatetime(tokenizer_t *tok, char *value, const char *num_end, struct tm *time);
+    Datetime *_Mytoml_ParseDatetime(Tokenizer *tok, char *value, const char *num_end, struct tm *time);
 
-    TomlValue *_Mytoml_ParseArray(tokenizer_t *tok, TomlValue *arr);
+    TomlValue *_Mytoml_ParseArray(Tokenizer *tok, TomlValue *arr);
 
     /*
         Function `_Mytoml_ParseValue` looks at a character
@@ -549,13 +573,12 @@ extern "C"
         allows it to be used anywhere a value needs to be
         parsed.
     */
-    TomlValue *_Mytoml_ParseValue(tokenizer_t *tok, const char *num_end);
+    TomlValue *_Mytoml_ParseValue(Tokenizer *tok, const char *num_end);
 
     //-----------------------------------------------------------------------------
     // [SECTION] MyToml Function Definations
     //-----------------------------------------------------------------------------
 
-    // Helper function to append formatted text to a string buffer
     void _Mytoml_AppendToBuffer(char **buffer, size_t *size, const char *format, ...)
     {
         va_list args;
@@ -609,9 +632,9 @@ extern "C"
     // [SECTION] Tokenizer
     //-----------------------------------------------------------------------------
 
-    tokenizer_t *_Mytoml_NewTokenizer(Input input)
+    Tokenizer *_Mytoml_NewTokenizer(Input input)
     {
-        tokenizer_t *tok = calloc(1, sizeof(tokenizer_t));
+        Tokenizer *tok = calloc(1, sizeof(Tokenizer));
         tok->input = input;
         tok->cursor = 0;
         tok->token = '\0';
@@ -624,7 +647,7 @@ extern "C"
         return tok;
     }
 
-    int _Mytoml_NextTokenizerToken(tokenizer_t *tok)
+    int _Mytoml_NextTokenizerToken(Tokenizer *tok)
     {
         tok->prev_prev = tok->prev;
         tok->prev = tok->token;
@@ -665,7 +688,7 @@ extern "C"
         return 0;
     }
 
-    void _Mytoml_TokenizerBacktrace(tokenizer_t *tok, int count)
+    void _Mytoml_TokenizerBacktrace(Tokenizer *tok, int count)
     {
         int pre_count = count + 2;
         if (count > 0 && tok->cursor > pre_count)
@@ -692,7 +715,7 @@ extern "C"
         }
     }
 
-    bool _Mytoml_TokenizerLoadInput(tokenizer_t *tok)
+    bool _Mytoml_TokenizerLoadInput(Tokenizer *tok)
     {
         FILE *stream;
         if (tok->input.type == I_FILE)
@@ -727,27 +750,27 @@ extern "C"
         return true;
     }
 
-    bool _Mytoml_TokenizerHasToken(tokenizer_t *tok)
+    bool _Mytoml_TokenizerHasToken(Tokenizer *tok)
     {
         return tok->is_null;
     }
 
-    char _Mytoml_TokenizerGetToken(tokenizer_t *tok)
+    char _Mytoml_TokenizerGetToken(Tokenizer *tok)
     {
         return tok->token;
     }
 
-    char _Mytoml_TokenizerGetPrev(tokenizer_t *tok)
+    char _Mytoml_TokenizerGetPrev(Tokenizer *tok)
     {
         return tok->prev;
     }
 
-    char _Mytoml_TokenizerGetPrevPrev(tokenizer_t *tok)
+    char _Mytoml_TokenizerGetPrevPrev(Tokenizer *tok)
     {
         return tok->prev_prev;
     }
 
-    void _Mytoml_FreeTokenizer(tokenizer_t *tok)
+    void _Mytoml_FreeTokenizer(Tokenizer *tok)
     {
         free(tok->input.stream);
         free(tok);
@@ -1183,7 +1206,7 @@ extern "C"
     // [SECTION] Myjson Parser Key
     //-----------------------------------------------------------------------------
 
-    TomlKey *_Mytoml_ParserBareKey(tokenizer_t *tok, char end, TomlKeyType branch, TomlKeyType leaf)
+    TomlKey *_Mytoml_ParserBareKey(Tokenizer *tok, char end, TomlKeyType branch, TomlKeyType leaf)
     {
         char id[MYTOML_MAX_ID_LENGTH] = {0};
         int idx = 0;
@@ -1227,7 +1250,7 @@ extern "C"
         return NULL;
     }
 
-    TomlKey *_Mytoml_ParserBAsicQuotedKey(tokenizer_t *tok, char end, TomlKeyType branch, TomlKeyType leaf)
+    TomlKey *_Mytoml_ParserBAsicQuotedKey(Tokenizer *tok, char end, TomlKeyType branch, TomlKeyType leaf)
     {
         char id[MYTOML_MAX_ID_LENGTH] = {0};
         int idx = 0;
@@ -1292,7 +1315,7 @@ extern "C"
         return NULL;
     }
 
-    TomlKey *_Mytoml_ParserLiteralQuotedKey(tokenizer_t *tok, char end, TomlKeyType branch, TomlKeyType leaf)
+    TomlKey *_Mytoml_ParserLiteralQuotedKey(Tokenizer *tok, char end, TomlKeyType branch, TomlKeyType leaf)
     {
         char id[MYTOML_MAX_ID_LENGTH] = {0};
         int idx = 0;
@@ -1341,7 +1364,7 @@ extern "C"
         return NULL;
     }
 
-    TomlKey *_Mytoml_ParseKey(tokenizer_t *tok, TomlKey *key, bool expecting)
+    TomlKey *_Mytoml_ParseKey(Tokenizer *tok, TomlKey *key, bool expecting)
     {
         while (_Mytoml_TokenizerHasToken(tok))
         {
@@ -1391,7 +1414,7 @@ extern "C"
         return NULL;
     }
 
-    TomlKey *_Mytoml_ParseTable(tokenizer_t *tok, TomlKey *key, bool expecting)
+    TomlKey *_Mytoml_ParseTable(Tokenizer *tok, TomlKey *key, bool expecting)
     {
         while (_Mytoml_TokenizerHasToken(tok))
         {
@@ -1441,7 +1464,7 @@ extern "C"
         return NULL;
     }
 
-    TomlKey *_Mytoml_ParseArrayTable(tokenizer_t *tok, TomlKey *key, bool expecting)
+    TomlKey *_Mytoml_ParseArrayTable(Tokenizer *tok, TomlKey *key, bool expecting)
     {
         while (_Mytoml_TokenizerHasToken(tok))
         {
@@ -1493,7 +1516,7 @@ extern "C"
         return NULL;
     }
 
-    TomlKey *_Mytoml_ParseKeyValue(tokenizer_t *tok, TomlKey *key, TomlKey *root)
+    TomlKey *_Mytoml_ParseKeyValue(Tokenizer *tok, TomlKey *key, TomlKey *root)
     {
         if (_Mytoml_IsCommentStart(_Mytoml_TokenizerGetToken(tok)))
         {
@@ -1591,7 +1614,7 @@ extern "C"
     // [SECTION] Myjson Parser Value
     //-----------------------------------------------------------------------------
 
-    char *_Mytoml_ParseBasicString(tokenizer_t *tok, char *value, bool multi)
+    char *_Mytoml_ParseBasicString(Tokenizer *tok, char *value, bool multi)
     {
         int idx = 0;
         while (_Mytoml_TokenizerHasToken(tok))
@@ -1697,7 +1720,7 @@ extern "C"
         return NULL;
     }
 
-    char *_Mytoml_ParseLiteralString(tokenizer_t *tok, char *value, bool multi)
+    char *_Mytoml_ParseLiteralString(Tokenizer *tok, char *value, bool multi)
     {
         int idx = 0;
         while (_Mytoml_TokenizerHasToken(tok))
@@ -1760,9 +1783,9 @@ extern "C"
         return NULL;
     }
 
-    datetime_t *_Mytoml_ParseDatetime(tokenizer_t *tok, char *value, const char *num_end, struct tm *time)
+    Datetime *_Mytoml_ParseDatetime(Tokenizer *tok, char *value, const char *num_end, struct tm *time)
     {
-        datetime_t *dt = NULL;
+        Datetime *dt = NULL;
         int idx = 0;
         // check to allow only 1 whitespace character
         int spaces = 0;
@@ -1831,7 +1854,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("YYYY-mm-DDTHH:MM:SS.-HH:MM") + mlen + spaces)),
                                      "datetime has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(datetime_t));
+                    dt = calloc(1, sizeof(Datetime));
                     dt->type = TOML_DATETIME;
                     dt->dt = time;
                     mlen = (mlen > 3) ? mlen : 3;
@@ -1876,7 +1899,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("YYYY-mm-DDTHH:MM:SS-HH:MM") + spaces)),
                                      "datetime has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(datetime_t));
+                    dt = calloc(1, sizeof(Datetime));
                     dt->type = TOML_DATETIME;
                     dt->dt = time;
                     int sz = strlen("%Y-%m-%dT%H:%M:%S-HH:MM") + 1;
@@ -1916,7 +1939,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("YYYY-mm-DDTHH:MM:SS.Z") + mlen + spaces)),
                                      "datetime has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(datetime_t));
+                    dt = calloc(1, sizeof(Datetime));
                     dt->type = TOML_DATETIME;
                     dt->dt = time;
                     mlen = (mlen > 3) ? mlen : 3;
@@ -1953,7 +1976,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("YYYY-mm-DDTHH:MM:SS.") + mlen + spaces)),
                                      "datetime has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(datetime_t));
+                    dt = calloc(1, sizeof(Datetime));
                     dt->type = TOML_DATETIMELOCAL;
                     dt->dt = time;
                     mlen = (mlen > 3) ? mlen : 3;
@@ -1994,7 +2017,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("YYYY-mm-DDTHH:MM:SSZ") + spaces)),
                                      "datetime has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(datetime_t));
+                    dt = calloc(1, sizeof(Datetime));
                     dt->type = TOML_DATETIME;
                     dt->dt = time;
                     int sz = strlen("%Y-%m-%dT%H:%M:%SZ") + 1;
@@ -2023,7 +2046,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("YYYY-mm-DDTHH:MM:SS") + spaces)),
                                      "datetime has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(datetime_t));
+                    dt = calloc(1, sizeof(Datetime));
                     dt->type = TOML_DATETIMELOCAL;
                     dt->dt = time;
                     int sz = strlen("%Y-%m-%dT%H:%M:%S");
@@ -2043,7 +2066,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("YYYY-mm-DD") + spaces)),
                                      "date has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(datetime_t));
+                    dt = calloc(1, sizeof(Datetime));
                     dt->type = TOML_DATELOCAL;
                     dt->dt = time;
                     int sz = strlen("%Y-%m-%d");
@@ -2072,7 +2095,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("HH:MM:SS.") + mlen + spaces)),
                                      "time has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(datetime_t));
+                    dt = calloc(1, sizeof(Datetime));
                     dt->type = TOML_TIMELOCAL;
                     dt->dt = time;
                     mlen = (mlen > 3) ? mlen : 3;
@@ -2097,7 +2120,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("HH:MM:SS") + spaces)),
                                      "time has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(datetime_t));
+                    dt = calloc(1, sizeof(Datetime));
                     dt->type = TOML_TIMELOCAL;
                     dt->dt = time;
                     int sz = strlen("%H:%M:%S");
@@ -2127,7 +2150,7 @@ extern "C"
 
     double
     _Mytoml_ParseInfNan(
-        tokenizer_t *tok,
+        Tokenizer *tok,
         bool negative)
     {
         double ret = 0.0;
@@ -2169,7 +2192,7 @@ extern "C"
 
     TomlValue *
     _Mytoml_ParseArray(
-        tokenizer_t *tok,
+        Tokenizer *tok,
         TomlValue *arr)
     {
         bool sep = true;
@@ -2213,7 +2236,7 @@ extern "C"
     }
 
     double
-    _Mytoml_ParseBoolean(tokenizer_t *tok)
+    _Mytoml_ParseBoolean(Tokenizer *tok)
     {
         double ret = 2.0;
         if (_Mytoml_TokenizerGetToken(tok) == 't')
@@ -2257,7 +2280,7 @@ extern "C"
     }
 
     TomlKey *
-    _Mytoml_ParseInlineTable(tokenizer_t *tok)
+    _Mytoml_ParseInlineTable(Tokenizer *tok)
     {
         TomlKey *keys = _Mytoml_NewKey(TOML_TABLE);
         bool sep = true;
@@ -2327,7 +2350,7 @@ extern "C"
         return NULL;
     }
 
-    bool _Mytoml_ParseComment(tokenizer_t *tok)
+    bool _Mytoml_ParseComment(Tokenizer *tok)
     {
         while (_Mytoml_TokenizerHasToken(tok))
         {
@@ -2345,7 +2368,7 @@ extern "C"
         return true;
     }
 
-    void _Mytoml_ParseWhitespace(tokenizer_t *tok)
+    void _Mytoml_ParseWhitespace(Tokenizer *tok)
     {
         while (_Mytoml_TokenizerHasToken(tok))
         {
@@ -2357,7 +2380,7 @@ extern "C"
         }
     }
 
-    bool _Mytoml_ParseNewline(tokenizer_t *tok)
+    bool _Mytoml_ParseNewline(Tokenizer *tok)
     {
         if (_Mytoml_IsNewline(_Mytoml_TokenizerGetToken(tok)))
         {
@@ -2379,7 +2402,7 @@ extern "C"
     }
 
     int _Mytoml_ParseUnicode(
-        tokenizer_t *tok,
+        Tokenizer *tok,
         char *escaped,
         int len)
     {
@@ -2476,7 +2499,7 @@ extern "C"
     }
 
     int _Mytoml_ParseEscape(
-        tokenizer_t *tok,
+        Tokenizer *tok,
         char *escaped,
         int len)
     {
@@ -2549,7 +2572,7 @@ extern "C"
 
     double
     _Mytoml_ParseBaseUnit(
-        tokenizer_t *tok,
+        Tokenizer *tok,
         int base,
         char *value,
         const char *num_end)
@@ -2607,13 +2630,13 @@ extern "C"
         return d;
     }
 
-    number_t *
+    Number *
     _Mytoml_ParseNumber(
-        tokenizer_t *tok,
+        Tokenizer *tok,
         char *value,
         double *d,
         const char *num_end,
-        number_t *n)
+        Number *n)
     {
         int idx = 0;
         n->type = TOML_INT;
@@ -2752,7 +2775,7 @@ extern "C"
 
     TomlValue *
     _Mytoml_ParseValue(
-        tokenizer_t *tok,
+        Tokenizer *tok,
         const char *num_end)
     {
         while (_Mytoml_TokenizerHasToken(tok))
@@ -2835,7 +2858,7 @@ extern "C"
                 {
                     _Mytoml_TokenizerBacktrace(tok, a + b);
                     struct tm *time = calloc(1, sizeof(struct tm));
-                    datetime_t *dt = _Mytoml_ParseDatetime(tok, value, num_end, time);
+                    Datetime *dt = _Mytoml_ParseDatetime(tok, value, num_end, time);
                     FUNC_IF_FAILED(dt, free, time);
                     RETURN_IF_FAILED(dt, "could not parse time\n");
                     TomlValue *v = _Mytoml_NewDatetimeValue(dt->dt, dt->type, dt->format, dt->millis);
@@ -2855,7 +2878,7 @@ extern "C"
                     {
                         _Mytoml_TokenizerBacktrace(tok, a + b + c + d);
                         struct tm *time = calloc(1, sizeof(struct tm));
-                        datetime_t *dt = _Mytoml_ParseDatetime(tok, value, num_end, time);
+                        Datetime *dt = _Mytoml_ParseDatetime(tok, value, num_end, time);
                         FUNC_IF_FAILED(dt, free, time);
                         RETURN_IF_FAILED(dt, "could not parse datetime\n");
                         TomlValue *v = _Mytoml_NewDatetimeValue(dt->dt, dt->type, dt->format, dt->millis);
@@ -2869,8 +2892,8 @@ extern "C"
                     }
                 }
                 double *d = calloc(1, sizeof(double));
-                number_t *num = calloc(1, sizeof(number_t));
-                number_t *n = _Mytoml_ParseNumber(tok, value, d, num_end, num);
+                Number *num = calloc(1, sizeof(Number));
+                Number *n = _Mytoml_ParseNumber(tok, value, d, num_end, num);
                 FUNC_IF_FAILED(n, free, d);
                 FUNC_IF_FAILED(n, free, n);
                 RETURN_IF_FAILED(n, "could not parse number\n");
@@ -2927,43 +2950,13 @@ extern "C"
     // [SECTION] MyToml Main
     //-----------------------------------------------------------------------------
 
-    // TODO: Implement in Generic.
-    MYTOML_API TomlKey *tomlLoad(char *file)
-    {
-        TomlKey *root = _Mytoml_NewKey(TOML_TABLE);
-        memcpy(root->id, "root", strlen("root"));
-
-        Input input = {.type = I_File, .file.name = file};
-        tokenizer_t *tok = _Mytoml_NewTokenizer(input);
-        bool ok = _Mytoml_TokenizerLoadInput(tok);
-        RETURN_IF_FAILED(ok, "Failed to load input from %s\n", file);
-        _Mytoml_NextTokenizerToken(tok);
-
-        int line, col;
-        TomlKey *key = root;
-        while (_Mytoml_TokenizerHasToken(tok) != 0)
-        {
-            key = _Mytoml_ParseKeyValue(tok, key, root);
-            line = tok->line;
-            col = tok->col;
-            FUNC_IF_FAILED(key, _Mytoml_FreeTokenizer, tok);
-            FUNC_IF_FAILED(key, tomlFree, root);
-            RETURN_IF_FAILED(key, "Encountered an error while parsing %s\n"
-                                  "At line %d column %d\n",
-                             file, line + 1, col);
-        }
-
-        _Mytoml_FreeTokenizer(tok);
-        return root;
-    }
-
     MYTOML_API TomlKey *tomlLoadFile(char *file)
     {
         TomlKey *root = _Mytoml_NewKey(TOML_TABLE);
         memcpy(root->id, "root", strlen("root"));
 
         Input input = {.type = I_File, .file.name = file};
-        tokenizer_t *tok = _Mytoml_NewTokenizer(input);
+        Tokenizer *tok = _Mytoml_NewTokenizer(input);
         bool ok = _Mytoml_TokenizerLoadInput(tok);
         RETURN_IF_FAILED(ok, "Failed to load input from %s\n", file);
         _Mytoml_NextTokenizerToken(tok);
@@ -2992,9 +2985,36 @@ extern "C"
         memcpy(root->id, "root", strlen("root"));
 
         Input input = {.type = I_File, .file.pointer = file};
-        tokenizer_t *tok = _Mytoml_NewTokenizer(input);
+        Tokenizer *tok = _Mytoml_NewTokenizer(input);
         bool ok = _Mytoml_TokenizerLoadInput(tok);
         RETURN_IF_FAILED(ok, "Failed to load input from %s\n", "FILE");
+        _Mytoml_NextTokenizerToken(tok);
+
+        int line, col;
+        TomlKey *key = root;
+        while (_Mytoml_TokenizerHasToken(tok) != 0)
+        {
+            key = _Mytoml_ParseKeyValue(tok, key, root);
+            line = tok->line;
+            col = tok->col;
+            FUNC_IF_FAILED(key, _Mytoml_FreeTokenizer, tok);
+            FUNC_IF_FAILED(key, tomlFree, root);
+            RETURN_IF_FAILED(key, "Encountered an error while parsing %s\n"
+                                  "At line %d column %d\n",
+                             "FILE", line + 1, col);
+        }
+
+        _Mytoml_FreeTokenizer(tok);
+        return root;
+    };
+
+    MYTOML_API TomlKey *tomlLoads(const char *toml)
+    {
+        TomlKey *root = _Mytoml_NewKey(TOML_TABLE);
+        memcpy(root->id, "root", strlen("root"));
+
+        Input input = {.type = I_STREAM, .stream = toml};
+        Tokenizer *tok = _Mytoml_NewTokenizer(input);
         _Mytoml_NextTokenizerToken(tok);
 
         int line, col;

@@ -1,8 +1,9 @@
 /**
  * @file mytoml.h
  * @brief TOML parser library header for C/C++.
- * @details This header provides all public API, types, macros, and configuration for the mytoml TOML parser library. It is compliant with TOML v1.0.0 and supports both C and C++ usage.
- * @author Sackey Ezekiel Etrue
+ * @details This header provides all public API, types, macros, and configuration for the mytoml TOML parser library.
+ *  It is compliant with [TOML v1.0.0](https://toml.io/en/v1.0.0) and supports both C and C++ usage.
+ * @author Sackey Ezekiel Etrue (djoezeke)
  * @date Mon 29 09:06:15 Sept GMT 2025
  * @version 0.1.0
  * @see https://www.github.com/djoezeke/mytoml
@@ -25,7 +26,7 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- * 
+ *
  * Usage:
  * @code
  *  #include <mytoml.h>
@@ -37,6 +38,12 @@
  *  [SECTION] Data Structures
  *  [SECTION] C++ Only Classes
  *  [SECTION] C Only Functions
+ *
+ * Resources:
+ * - Homepage ................... https://github.com/djoezeke/mytoml
+ * - Releases & changelog ....... https://github.com/djoezeke/mytoml/releases
+ * - Issues & support ........... https://github.com/djoezeke/mytoml/issues
+ *
  *
  */
 
@@ -50,22 +57,28 @@
  */
 
 /**
+ * @def MYTOML_VERSION_MAJOR
  * @brief Major version number of the library.
  */
 #define MYTOML_VERSION_MAJOR 0
 
 /**
+ * @def MYTOML_VERSION_MINOR
  * @brief Minor version number of the library.
  */
 #define MYTOML_VERSION_MINOR 1
 
 /**
+ * @def MYTOML_VERSION_PATCH
  * @brief Patch version number of the library.
  */
 #define MYTOML_VERSION_PATCH 0
 
 /**
- * @brief Library version string in the format "X.Y.Z".
+ * @def MYTOML_VERSION
+ * @brief Library version string in the format @c "X.Y.Z",
+ * where @c X is the major version number, @c Y is a minor version
+ * number, and @c Z is the patch version number.
  */
 #define MYTOML_VERSION "0.1.0"
 
@@ -92,51 +105,167 @@
 /**
  * @def MYTOML_MAX_DATE_FORMAT
  * @brief Maximum length for date format strings.
- * @note Default is 64.
+ * @note Default is 64 [`2^6`].
  */
 #define MYTOML_MAX_DATE_FORMAT 64
 
 /**
  * @def MYTOML_MAX_ID_LENGTH
  * @brief Maximum length for TOML key identifiers.
- * @note Default is 256.
+ * @note Default is 256 [`2^8`].
  */
 #define MYTOML_MAX_ID_LENGTH 256
 
 /**
  * @def MYTOML_MAX_STRING_LENGTH
  * @brief Maximum length for TOML string values.
- * @note Default is 4096.
+ * @note Default is 4096 [`2^12`].
  */
 #define MYTOML_MAX_STRING_LENGTH 4096
 
 /**
  * @def MYTOML_MAX_FILE_SIZE
  * @brief Maximum TOML file size in bytes.
- * @note Default is 1073741824 (1GB).
+ * @note Default is 1073741824 [`2^30`](1GB).
  */
 #define MYTOML_MAX_FILE_SIZE 1073741824
 
 /**
  * @def MYTOML_MAX_NUM_LINES
  * @brief Maximum number of lines in a TOML file.
- * @note Default is 16777216.
+ * @note Default is 16777216 [`2^24`].
  */
 #define MYTOML_MAX_NUM_LINES 16777216
 
 /**
  * @def MYTOML_MAX_SUBKEYS
  * @brief Maximum number of subkeys per TOML key.
- * @note Default is 131072.
+ * @note Default is 131072 [`2^17`].
  */
 #define MYTOML_MAX_SUBKEYS 131072
 
 /**
  * @def MYTOML_MAX_ARRAY_LENGTH
  * @brief Maximum length of TOML arrays.
- * @note Default is 131072.
+ * @note Default is 131072 [`2^17`].
  */
 #define MYTOML_MAX_ARRAY_LENGTH 131072
+
+//-----------------------------------------------------------------------------
+// [SECTION] Mytoml Function Macros
+//-----------------------------------------------------------------------------
+
+/**
+ * @brief Load and parse a TOML file or stdin.
+ * @param[in] file Path to TOML file or NULL for stdin.
+ * @return Pointer to root TomlKey object, or NULL on failure.
+ * @note Frees memory with tomlFree().
+ * @see tomlFree
+ * Example usage:
+ * @code
+ * TomlKey *toml = tomlLoad("basic.toml");
+ * if (toml == NULL) return 1;
+ * tomlFree(toml);
+ * @endcode
+ * @note This macro uses C11 _Generic to select the appropriate function based on the type of `file`.
+ * If `file` is a `char *`, it calls `tomlLoadFile()`. If `file` is a `FILE *`, it calls `tomlLoadFILE()`.
+ * This allows for flexible loading of TOML data from either a file path or an open file stream using a single macro.
+ * @warning The user must ensure that the types passed to the macro match the expected types to avoid compilation errors.
+ * Improper usage may lead to undefined behavior.
+ * @warning The file must exist and be readable. If using a `FILE *`, the caller is responsible for managing the lifetime of the FILE stream.
+ * Failure to do so may result in resource leaks or crashes.
+ *
+ */
+#define tomlLoad(file) _Generic((file), \
+    char *: tomlLoadFile,               \
+    FILE *: tomlLoadFILE)(file)
+
+/**
+ * @brief Dump TOML value or key to a file or stream.
+ * @param[in] object TOML key or value to dump.
+ * @param[in] file Output filename or FILE stream.
+ * @see tomlKeyDumpFile, tomlKeyDumpFILE, tomlValueDumpFile, tomlValueDumpFILE
+ * Example usage:
+ * @code
+ * TomlKey *toml = tomlLoad("config.toml");
+ * if (toml == NULL) {
+ *   fprintf(stderr, "Failed to load TOML file\n");
+ *   return 1;
+ * }
+ * // Dump to stdout
+ * tomlValueDump(toml, stdout);
+ * // Dump to file
+ * tomlValueDump(toml, "output.toml");
+ * tomlFree(toml);
+ * @endcode
+ * @note This macro uses C11 _Generic to select the appropriate function based on the types of `object` and `file`.
+ * For `TomlKey *` objects, it calls either `tomlKeyDumpFile()` or `tomlKeyDumpFILE()` depending on whether `file` is a `char *` filename or a `FILE *` stream.
+ * For `TomlValue *` objects, it calls either `tomlValueDumpFile()` or `tomlValueDumpFILE()` similarly.
+ * This allows for flexible dumping of both keys and values to either files or streams using a single macro.
+ * @warning The user must ensure that the types passed to the macro match the expected types to avoid compilation errors.
+ * Improper usage may lead to undefined behavior.
+ * @warning The file or stream must be valid and writable. The caller is responsible for managing the lifetime of the FILE stream if used.
+ * Failure to do so may result in resource leaks or crashes.
+ */
+#define tomlValueDump(object, file) _Generic((object), \
+    TomlKey *: _Generic((file),                        \
+            char *: tomlKeyDumpFile,                   \
+            FILE *: tomlKeyDumpFILE),                  \
+    TomlValue *: _Generic((file),                      \
+            char *: tomlValueDumpFile,                 \
+            FILE *: tomlValueDumpFILE, ))(object, file)
+
+/**
+ * @brief Serialize TOML value or key to a string.
+ * @param[in] object TOML key or value to serialize.
+ * @return Pointer to string buffer (must be freed by caller).
+ * @see tomlKeyDumps, tomlValueDumps
+ * Example usage:
+ * @code
+ * TomlKey *toml = tomlLoad("basic.toml");
+ * if (toml == NULL) return 1;
+ * const char *json = tomlDumps(toml);
+ * printf("%s\n", json);
+ * free((void *)json);
+ * tomlFree(toml);
+ * @endcode
+ * @note This macro uses C11 _Generic to select the appropriate function based on the type of `object`.
+ * For `TomlKey *`, it calls `tomlKeyDumps()`, and for `TomlValue *`, it calls `tomlValueDumps()`.
+ * @warning The returned string must be freed by the caller to avoid memory leaks.
+ *
+ */
+#define tomlDumps(object) _Generic((object), \
+    TomlKey *: tomlKeyDumps,                 \
+    TomlValue *: tomlValueDumps)(object)
+
+/**
+ * @brief Dump TOML value or key to a buffer.
+ * @param[in] object TOML key or value to dump.
+ * @param[out] buffer Pointer to output buffer.
+ * @param[out] size Size of output buffer.
+ * @see tomlKeyDumpBuffer, tomlValueDumpBuffer
+ * Example usage:
+ * @code
+ * TomlKey *toml = tomlLoad("basic.toml");
+ * if (toml == NULL) return 1;
+ * char *buffer = "";
+ * size_t size = 0;
+ * tomlDumpBuffer(toml, &buffer, &size);
+ * printf("%s\n", buffer);
+ * free(buffer);
+ * tomlFree(toml);
+ * @endcode
+ * @note This macro uses C11 _Generic to select the appropriate function based on the type of `object`.
+ * For `TomlKey *`, it calls `tomlKeyDumpBuffer()`, and for `TomlValue *`, it calls `tomlValueDumpBuffer()`.
+ * @warning The user must ensure that the types passed to the macro match the expected types to avoid compilation errors.
+ * Improper usage may lead to undefined behavior.
+ * @warning The buffer must be managed by the caller. The caller is responsible for freeing the
+ * buffer to avoid memory leaks.
+ *
+ */
+#define tomlDumpBuffer(object, buffer, size) _Generic((object), \
+    TomlKey *: tomlKeyDumpBuffer,                               \
+    TomlValue *: tomlValueDumpBuffer)(object, buffer, size)
 
 #ifdef __cplusplus
 
@@ -335,23 +464,11 @@ extern "C"
      */
 
     /**
-     * @brief Load and parse a TOML file or stdin.
-     * @param[in] file Path to TOML file or NULL for stdin.
-     * @return Pointer to root TomlKey object, or NULL on failure.
-     * @note Frees memory with tomlFree().
-     * @see tomlFree
-     * @code
-     * TomlKey *toml = tomlLoad("basic.toml");
-     * if (toml == NULL) return 1;
-     * tomlFree(toml);
-     * @endcode
-     */
-    MYTOML_API TomlKey *tomlLoad(char *file);
-
-    /**
      * @brief Load and parse a TOML file from a filename.
      * @param[in] file Path to TOML file.
      * @return Pointer to root TomlKey object, or NULL on failure.
+     * @note Frees memory with tomlFree().
+     * @see tomlFree
      */
     MYTOML_API TomlKey *tomlLoadFile(char *file);
 
@@ -359,6 +476,8 @@ extern "C"
      * @brief Load and parse a TOML file from a FILE pointer.
      * @param[in] file FILE pointer to TOML file.
      * @return Pointer to root TomlKey object, or NULL on failure.
+     * @note Frees memory with tomlFree().
+     * @see tomlFree
      */
     MYTOML_API TomlKey *tomlLoadFILE(FILE *file);
 
@@ -369,36 +488,15 @@ extern "C"
      * @note Frees memory with tomlFree().
      * @see tomlFree
      */
-    // MYTOML_API TomlKey *tomlLoads(const char *toml);
-
-    // TODO : Implement method and  Generic call.
-    /**
-     * @brief Load a toml string or filename.
-     *
-     * @code
-     *  #include <mytoml.h>
-     *
-     *  int main(int argc, char *argv[])
-     *  {
-     *      TomlKey *toml = tomlLoad("basic.toml");
-     *      if (toml == NULL)
-     *          return 1;
-     *
-     *      tomlDump(toml,"simple.toml")
-     *      tomlFree(toml);
-     *      return 0;
-     *  }
-     * @endcode
-     *
-     * @param[in,out]  toml  A toml string or filename.
-     * @returns the `TomlKey` object or @c NULL if failed to from `string` or file.
-     */
-    // tomlDump(key_or_value, file_or_FILE);
+    MYTOML_API TomlKey *tomlLoads(const char *toml);
 
     /**
      * @brief Dump TOML key to a FILE stream.
      * @param[in] object TOML key to dump.
      * @param[in] file Output FILE stream.
+     * @warning The file must be valid and writable.
+     * The caller is responsible for managing the lifetime of the FILE stream if used.
+     * Failure to do so may result in resource leaks or crashes.
      */
     MYTOML_API void tomlKeyDumpFILE(TomlKey *object, FILE *file);
 
@@ -413,6 +511,9 @@ extern "C"
      * @brief Dump TOML value to a FILE stream.
      * @param[in] object TOML value to dump.
      * @param[in] file Output FILE stream.
+     * @warning The file must be valid and writable.
+     * The caller is responsible for managing the lifetime of the FILE stream if used.
+     * Failure to do so may result in resource leaks or crashes.
      */
     MYTOML_API void tomlValueDumpFILE(TomlValue *object, FILE *file);
 
@@ -427,6 +528,7 @@ extern "C"
      * @brief Serialize TOML key to a string.
      * @param[in] k TOML key to serialize.
      * @return Pointer to string buffer (must be freed by caller).
+     * @warning The returned string must be freed by the caller to avoid memory leaks.
      */
     MYTOML_API const char *tomlKeyDumps(TomlKey *k);
 
@@ -434,6 +536,7 @@ extern "C"
      * @brief Serialize TOML value to a string.
      * @param[in] v TOML value to serialize.
      * @return Pointer to string buffer (must be freed by caller).
+     * @warning The returned string must be freed by the caller to avoid memory leaks.
      */
     MYTOML_API const char *tomlValueDumps(TomlValue *v);
 
@@ -442,6 +545,8 @@ extern "C"
      * @param[in] k TOML key to dump.
      * @param[out] buffer Pointer to output buffer.
      * @param[out] size Size of output buffer.
+     * @warning The buffer must be managed by the caller. The caller is responsible for freeing the
+     * buffer to avoid memory leaks.
      */
     MYTOML_API void tomlKeyDumpBuffer(TomlKey *k, char **buffer, size_t *size);
 
@@ -450,6 +555,8 @@ extern "C"
      * @param[in] v TOML value to dump.
      * @param[out] buffer Pointer to output buffer.
      * @param[out] size Size of output buffer.
+     * @warning The buffer must be managed by the caller. The caller is responsible for freeing the
+     * buffer to avoid memory leaks.     *
      */
     MYTOML_API void tomlValueDumpBuffer(TomlValue *v, char **buffer, size_t *size);
 
