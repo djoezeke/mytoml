@@ -13,9 +13,6 @@ extern "C"
     // [SECTION] MyToml Defines
     //-----------------------------------------------------------------------------
 
-#define MAX_FILE_SIZE 1073741824
-#define MAX_NUM_LINES 16777216 // 2^24
-
 /**
  * @brief Macro to log error message to stderr.
  *
@@ -172,15 +169,15 @@ extern "C"
     struct tokenizer
     {
         Input input;
-        int cursor;               /**the location in the input buffer */
-        char token;               /**the last read in token */
-        char prev;                /**the token read in before `token` */
-        char prev_prev;           /**the token read in before `prev` */
-        bool is_null;             /**boolean to indicate if `token` is non-NULL */
-        bool newline;             /**keeps track if we are on a newline */
-        int line;                 /**line number in the stream */
-        int col;                  /**column number in the stream */
-        int lines[MAX_NUM_LINES]; /**array where index=line and lines[index]=length */
+        int cursor;                      /**the location in the input buffer */
+        char token;                      /**the last read in token */
+        char prev;                       /**the token read in before `token` */
+        char prev_prev;                  /**the token read in before `prev` */
+        bool is_null;                    /**boolean to indicate if `token` is non-NULL */
+        bool newline;                    /**keeps track if we are on a newline */
+        int line;                        /**line number in the stream */
+        int col;                         /**column number in the stream */
+        int lines[MYTOML_MAX_NUM_LINES]; /**array where index=line and lines[index]=length */
     };
 
     /*
@@ -206,10 +203,10 @@ extern "C"
     typedef struct datetime datetime_t;
     struct datetime
     {
-        struct tm *dt;                     /**  */
-        TomlValueType type;                /**  */
-        char format[TOML_MAX_DATE_FORMAT]; /**  */
-        int millis;                        /**  */
+        struct tm *dt;                       /**  */
+        TomlValueType type;                  /**  */
+        char format[MYTOML_MAX_DATE_FORMAT]; /**  */
+        int millis;                          /**  */
     };
 
     /**
@@ -623,7 +620,7 @@ extern "C"
         tok->line = 0;
         tok->col = 0;
         tok->is_null = true;
-        memset(tok->lines, 0, MAX_NUM_LINES);
+        memset(tok->lines, 0, MYTOML_MAX_NUM_LINES);
         return tok;
     }
 
@@ -647,7 +644,7 @@ extern "C"
             }
             if (tok->prev == '\n')
             {
-                if (tok->line < MAX_NUM_LINES)
+                if (tok->line < MYTOML_MAX_NUM_LINES)
                 {
                     tok->lines[tok->line] = tok->col;
                 }
@@ -713,7 +710,7 @@ extern "C"
         fseek(stream, 0L, SEEK_END);
         long size = ftell(stream);
         fseek(stream, 0L, SEEK_SET);
-        if (size >= MAX_FILE_SIZE)
+        if (size >= MYTOML_MAX_FILE_SIZE)
         {
             LOG_ERR("input size is too big\n");
             return false;
@@ -726,7 +723,7 @@ extern "C"
         }
         buffer[size] = EOF;
         tok->input.stream = buffer;
-#undef MAX_FILE_SIZE
+#undef MYTOML_MAX_FILE_SIZE
         return true;
     }
 
@@ -787,8 +784,8 @@ extern "C"
         v->type = type;
         v->precision = millis;
         v->data = calloc(1, sizeof(struct tm));
-        memset(v->format, 0, TOML_MAX_DATE_FORMAT);
-        if (strlen(format) < TOML_MAX_DATE_FORMAT)
+        memset(v->format, 0, MYTOML_MAX_DATE_FORMAT);
+        if (strlen(format) < MYTOML_MAX_DATE_FORMAT)
         {
             memcpy(v->format, format, strlen(format));
         }
@@ -800,7 +797,7 @@ extern "C"
     {
         TomlValue *v = calloc(1, sizeof(TomlValue));
         v->type = TOML_ARRAY;
-        v->arr = calloc(1, sizeof(TomlValue *) * TOML_MAX_ARRAY_LENGTH);
+        v->arr = calloc(1, sizeof(TomlValue *) * MYTOML_MAX_ARRAY_LENGTH);
         v->len = 0;
         return v;
     }
@@ -853,7 +850,7 @@ extern "C"
         k->value = NULL;
         k->idx = -1;
         k->subkeys = kh_init(str);
-        memset(k->id, 0, TOML_MAX_ID_LENGTH);
+        memset(k->id, 0, MYTOML_MAX_ID_LENGTH);
         return k;
     }
 
@@ -890,7 +887,7 @@ extern "C"
                                  subkey->id, (int)(subkey->type));
             }
         }
-        if (kh_size(key->subkeys) < TOML_MAX_SUBKEYS)
+        if (kh_size(key->subkeys) < MYTOML_MAX_SUBKEYS)
         {
             if (key->type == TOML_ARRAYTABLE)
             {
@@ -1188,13 +1185,13 @@ extern "C"
 
     TomlKey *_Mytoml_ParserBareKey(tokenizer_t *tok, char end, TomlKeyType branch, TomlKeyType leaf)
     {
-        char id[TOML_MAX_ID_LENGTH] = {0};
+        char id[MYTOML_MAX_ID_LENGTH] = {0};
         int idx = 0;
         bool done = false;
 
         while (_Mytoml_TokenizerHasToken(tok))
         {
-            RETURN_IF_FAILED(idx < TOML_MAX_ID_LENGTH, "buffer overflow\n");
+            RETURN_IF_FAILED(idx < MYTOML_MAX_ID_LENGTH, "buffer overflow\n");
             if (_Mytoml_IsDot(_Mytoml_TokenizerGetToken(tok)))
             {
                 RETURN_IF_FAILED(idx != 0, "key cannot be empty\n");
@@ -1232,12 +1229,12 @@ extern "C"
 
     TomlKey *_Mytoml_ParserBAsicQuotedKey(tokenizer_t *tok, char end, TomlKeyType branch, TomlKeyType leaf)
     {
-        char id[TOML_MAX_ID_LENGTH] = {0};
+        char id[MYTOML_MAX_ID_LENGTH] = {0};
         int idx = 0;
 
         while (_Mytoml_TokenizerHasToken(tok))
         {
-            RETURN_IF_FAILED(idx < TOML_MAX_ID_LENGTH, "buffer overflow\n");
+            RETURN_IF_FAILED(idx < MYTOML_MAX_ID_LENGTH, "buffer overflow\n");
             if (_Mytoml_IsBasicStringStart(_Mytoml_TokenizerGetToken(tok)))
             {
                 _Mytoml_NextTokenizerToken(tok);
@@ -1275,7 +1272,7 @@ extern "C"
                 for (int i = 0; i < c; i++)
                 {
                     id[idx++] = escaped[i];
-                    RETURN_IF_FAILED(idx < TOML_MAX_ID_LENGTH, "buffer overflow\n");
+                    RETURN_IF_FAILED(idx < MYTOML_MAX_ID_LENGTH, "buffer overflow\n");
                 }
                 // _Mytoml_ParseEscape will parse everything and move on to the next token
                 // so we call _Mytoml_TokenizerBacktrace here to offset the _Mytoml_NextTokenizerToken call outside
@@ -1297,12 +1294,12 @@ extern "C"
 
     TomlKey *_Mytoml_ParserLiteralQuotedKey(tokenizer_t *tok, char end, TomlKeyType branch, TomlKeyType leaf)
     {
-        char id[TOML_MAX_ID_LENGTH] = {0};
+        char id[MYTOML_MAX_ID_LENGTH] = {0};
         int idx = 0;
 
         while (_Mytoml_TokenizerHasToken(tok))
         {
-            RETURN_IF_FAILED(idx < TOML_MAX_ID_LENGTH, "buffer overflow\n");
+            RETURN_IF_FAILED(idx < MYTOML_MAX_ID_LENGTH, "buffer overflow\n");
             if (_Mytoml_IsLiteralStringStart(_Mytoml_TokenizerGetToken(tok)))
             {
                 _Mytoml_NextTokenizerToken(tok);
@@ -1533,7 +1530,7 @@ extern "C"
                 {
                     table->value = _Mytoml_NewArrayValue();
                 }
-                RETURN_IF_FAILED(table->idx < TOML_MAX_ARRAY_LENGTH - 1, "buffer overflow\n");
+                RETURN_IF_FAILED(table->idx < MYTOML_MAX_ARRAY_LENGTH - 1, "buffer overflow\n");
                 table->value->arr[++(table->idx)] = _Mytoml_NewTableValue(_Mytoml_NewKey(TOML_TABLE));
             }
             else
@@ -1599,7 +1596,7 @@ extern "C"
         int idx = 0;
         while (_Mytoml_TokenizerHasToken(tok))
         {
-            RETURN_IF_FAILED(idx < TOML_MAX_STRING_LENGTH, "buffer overflow\n");
+            RETURN_IF_FAILED(idx < MYTOML_MAX_STRING_LENGTH, "buffer overflow\n");
             if (_Mytoml_IsBasicStringStart(_Mytoml_TokenizerGetToken(tok)))
             {
                 if (!multi)
@@ -1620,7 +1617,7 @@ extern "C"
                             value[idx++] = '"';
                             _Mytoml_NextTokenizerToken(tok);
                         }
-                        RETURN_IF_FAILED(idx < TOML_MAX_STRING_LENGTH, "buffer overflow\n");
+                        RETURN_IF_FAILED(idx < MYTOML_MAX_STRING_LENGTH, "buffer overflow\n");
                         if (_Mytoml_IsBasicStringStart(_Mytoml_TokenizerGetToken(tok)))
                         {
                             value[idx++] = '"';
@@ -1674,7 +1671,7 @@ extern "C"
                     for (int i = 0; i < c; i++)
                     {
                         value[idx++] = escaped[i];
-                        RETURN_IF_FAILED(idx < TOML_MAX_STRING_LENGTH, "buffer overflow\n");
+                        RETURN_IF_FAILED(idx < MYTOML_MAX_STRING_LENGTH, "buffer overflow\n");
                     }
                     // _Mytoml_ParseEscape will parse everything and move on to the next token
                     // so we call _Mytoml_TokenizerBacktrace here to offset the _Mytoml_NextTokenizerToken call outside
@@ -1705,7 +1702,7 @@ extern "C"
         int idx = 0;
         while (_Mytoml_TokenizerHasToken(tok))
         {
-            RETURN_IF_FAILED(idx < TOML_MAX_STRING_LENGTH, "buffer overflow\n");
+            RETURN_IF_FAILED(idx < MYTOML_MAX_STRING_LENGTH, "buffer overflow\n");
             if (_Mytoml_IsLiteralStringStart(_Mytoml_TokenizerGetToken(tok)))
             {
                 if (!multi)
@@ -1726,7 +1723,7 @@ extern "C"
                             value[idx++] = '\'';
                             _Mytoml_NextTokenizerToken(tok);
                         }
-                        RETURN_IF_FAILED(idx < TOML_MAX_STRING_LENGTH, "buffer overflow\n");
+                        RETURN_IF_FAILED(idx < MYTOML_MAX_STRING_LENGTH, "buffer overflow\n");
                         if (_Mytoml_IsLiteralStringStart(_Mytoml_TokenizerGetToken(tok)))
                         {
                             value[idx++] = '\'';
@@ -1771,7 +1768,7 @@ extern "C"
         int spaces = 0;
         while (_Mytoml_TokenizerHasToken(tok))
         {
-            RETURN_IF_FAILED(idx < TOML_MAX_STRING_LENGTH, "buffer overflow\n");
+            RETURN_IF_FAILED(idx < MYTOML_MAX_STRING_LENGTH, "buffer overflow\n");
             if ((_Mytoml_IsWhitespace(_Mytoml_TokenizerGetToken(tok)) && spaces) ||
                 (!_Mytoml_IsWhitespace(_Mytoml_TokenizerGetToken(tok)) && _Mytoml_IsNumberEnd(_Mytoml_TokenizerGetToken(tok), num_end)))
             {
@@ -1840,8 +1837,8 @@ extern "C"
                     mlen = (mlen > 3) ? mlen : 3;
                     dt->millis = millis;
                     int sz = strlen("%Y-%m-%dT%H:%M:%S.-HH:MM") + mlen + 1;
-                    FUNC_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, free, dt);
-                    RETURN_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, "datetime string is too long");
+                    FUNC_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, free, dt);
+                    RETURN_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, "datetime string is too long");
                     int c = snprintf(dt->format, sz, "%%Y-%%m-%%dT%%H:%%M:%%S.%d%c%s:%s",
                                      millis, off_s[0], off_h, off_m);
                     return dt;
@@ -1883,8 +1880,8 @@ extern "C"
                     dt->type = TOML_DATETIME;
                     dt->dt = time;
                     int sz = strlen("%Y-%m-%dT%H:%M:%S-HH:MM") + 1;
-                    FUNC_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, free, dt);
-                    RETURN_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, "datetime string is too long");
+                    FUNC_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, free, dt);
+                    RETURN_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, "datetime string is too long");
                     int c = snprintf(dt->format, sz, "%%Y-%%m-%%dT%%H:%%M:%%S%c%s:%s",
                                      off_s[0], off_h, off_m);
                     return dt;
@@ -1925,8 +1922,8 @@ extern "C"
                     mlen = (mlen > 3) ? mlen : 3;
                     dt->millis = millis;
                     int sz = strlen("%Y-%m-%dT%H:%M:%S.Z") + mlen + 1;
-                    FUNC_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, free, dt);
-                    RETURN_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, "datetime string is too long");
+                    FUNC_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, free, dt);
+                    RETURN_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, "datetime string is too long");
                     int c = snprintf(dt->format, sz, "%%Y-%%m-%%dT%%H:%%M:%%S.%dZ", millis);
                     return dt;
                 }
@@ -1962,8 +1959,8 @@ extern "C"
                     mlen = (mlen > 3) ? mlen : 3;
                     dt->millis = millis;
                     int sz = strlen("%Y-%m-%dT%H:%M:%S.") + mlen + 1;
-                    FUNC_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, free, dt);
-                    RETURN_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, "datetime string is too long");
+                    FUNC_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, free, dt);
+                    RETURN_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, "datetime string is too long");
                     int c = snprintf(dt->format, sz, "%%Y-%%m-%%dT%%H:%%M:%%S.%d", millis);
                     return dt;
                 }
@@ -2001,8 +1998,8 @@ extern "C"
                     dt->type = TOML_DATETIME;
                     dt->dt = time;
                     int sz = strlen("%Y-%m-%dT%H:%M:%SZ") + 1;
-                    FUNC_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, free, dt);
-                    RETURN_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, "datetime string is too long");
+                    FUNC_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, free, dt);
+                    RETURN_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, "datetime string is too long");
                     int c = snprintf(dt->format, sz, "%%Y-%%m-%%dT%%H:%%M:%%SZ");
                     return dt;
                 }
@@ -2030,8 +2027,8 @@ extern "C"
                     dt->type = TOML_DATETIMELOCAL;
                     dt->dt = time;
                     int sz = strlen("%Y-%m-%dT%H:%M:%S");
-                    FUNC_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, free, dt);
-                    RETURN_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, "datetime string is too long");
+                    FUNC_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, free, dt);
+                    RETURN_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, "datetime string is too long");
                     memcpy(dt->format, "%Y-%m-%dT%H:%M:%S", sz);
                     return dt;
                 }
@@ -2050,8 +2047,8 @@ extern "C"
                     dt->type = TOML_DATELOCAL;
                     dt->dt = time;
                     int sz = strlen("%Y-%m-%d");
-                    FUNC_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, free, dt);
-                    RETURN_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, "datetime string is too long");
+                    FUNC_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, free, dt);
+                    RETURN_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, "datetime string is too long");
                     memcpy(dt->format, "%Y-%m-%d", sz);
                     return dt;
                 }
@@ -2081,8 +2078,8 @@ extern "C"
                     mlen = (mlen > 3) ? mlen : 3;
                     dt->millis = millis;
                     int sz = strlen("%H:%M:%S.") + mlen + 1;
-                    FUNC_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, free, dt);
-                    RETURN_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, "datetime string is too long");
+                    FUNC_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, free, dt);
+                    RETURN_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, "datetime string is too long");
                     int c = snprintf(dt->format, sz, "%%H:%%M:%%S.%d", millis);
                     return dt;
                 }
@@ -2104,8 +2101,8 @@ extern "C"
                     dt->type = TOML_TIMELOCAL;
                     dt->dt = time;
                     int sz = strlen("%H:%M:%S");
-                    FUNC_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, free, dt);
-                    RETURN_IF_FAILED(sz < TOML_MAX_DATE_FORMAT, "datetime string is too long");
+                    FUNC_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, free, dt);
+                    RETURN_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, "datetime string is too long");
                     memcpy(dt->format, "%H:%M:%S", sz);
                     return dt;
                 }
@@ -2178,7 +2175,7 @@ extern "C"
         bool sep = true;
         while (_Mytoml_TokenizerHasToken(tok))
         {
-            RETURN_IF_FAILED(arr->len < TOML_MAX_ARRAY_LENGTH, "buffer overflow\n");
+            RETURN_IF_FAILED(arr->len < MYTOML_MAX_ARRAY_LENGTH, "buffer overflow\n");
             if (_Mytoml_IsArrayEnd(_Mytoml_TokenizerGetToken(tok)))
             {
                 _Mytoml_NextTokenizerToken(tok);
@@ -2561,7 +2558,7 @@ extern "C"
         double d = -1;
         while (_Mytoml_TokenizerHasToken(tok))
         {
-            if (idx >= TOML_MAX_STRING_LENGTH)
+            if (idx >= MYTOML_MAX_STRING_LENGTH)
             {
                 LOG_ERR("buffer overflow\n");
                 break;
@@ -2624,7 +2621,7 @@ extern "C"
         n->precision = 0;
         while (_Mytoml_TokenizerHasToken(tok))
         {
-            RETURN_IF_FAILED(idx < TOML_MAX_STRING_LENGTH, "buffer overflow\n");
+            RETURN_IF_FAILED(idx < MYTOML_MAX_STRING_LENGTH, "buffer overflow\n");
             if (_Mytoml_IsNumberEnd(_Mytoml_TokenizerGetToken(tok), num_end))
             {
                 char *end;
@@ -2683,7 +2680,7 @@ extern "C"
                     n->type = TOML_FLOAT;
                     n->precision = 1;
                 }
-                RETURN_IF_FAILED(idx < TOML_MAX_STRING_LENGTH, "buffer overflow\n");
+                RETURN_IF_FAILED(idx < MYTOML_MAX_STRING_LENGTH, "buffer overflow\n");
                 _Mytoml_NextTokenizerToken(tok);
                 if (_Mytoml_IsDigit(_Mytoml_TokenizerGetToken(tok)) &&
                     _Mytoml_IsDigit(_Mytoml_TokenizerGetPrevPrev(tok)))
@@ -2768,7 +2765,7 @@ extern "C"
             }
             else if (_Mytoml_IsBasicStringStart(_Mytoml_TokenizerGetToken(tok)))
             {
-                char value[TOML_MAX_STRING_LENGTH] = {0};
+                char value[MYTOML_MAX_STRING_LENGTH] = {0};
                 char *s;
                 _Mytoml_NextTokenizerToken(tok);
                 if (_Mytoml_TokenizerHasToken(tok) && _Mytoml_IsBasicStringStart(_Mytoml_TokenizerGetToken(tok)))
@@ -2799,7 +2796,7 @@ extern "C"
             }
             else if (_Mytoml_IsLiteralStringStart(_Mytoml_TokenizerGetToken(tok)))
             {
-                char value[TOML_MAX_STRING_LENGTH] = {0};
+                char value[MYTOML_MAX_STRING_LENGTH] = {0};
                 char *s;
                 _Mytoml_NextTokenizerToken(tok);
                 if (_Mytoml_TokenizerHasToken(tok) && _Mytoml_IsLiteralStringStart(_Mytoml_TokenizerGetToken(tok)))
@@ -2830,7 +2827,7 @@ extern "C"
             }
             else if (_Mytoml_IsNumberStart(_Mytoml_TokenizerGetToken(tok)))
             {
-                char value[TOML_MAX_STRING_LENGTH] = {0};
+                char value[MYTOML_MAX_STRING_LENGTH] = {0};
                 // try parsing date time
                 bool a = _Mytoml_NextTokenizerToken(tok);
                 bool b = _Mytoml_NextTokenizerToken(tok);
