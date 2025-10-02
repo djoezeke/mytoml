@@ -34,16 +34,18 @@
  *
  * Index of this file:
  *  [SECTION] Header mess
+ *  [SECTION] Configurable macros
+ *  [SECTION] Function Macros
  *  [SECTION] Imports/Exports
  *  [SECTION] Data Structures
- *  [SECTION] C++ Only Classes
  *  [SECTION] C Only Functions
+ *  [SECTION] C++ Only Classes
+ *
  *
  * Resources:
  * - Homepage ................... https://github.com/djoezeke/mytoml
  * - Releases & changelog ....... https://github.com/djoezeke/mytoml/releases
  * - Issues & support ........... https://github.com/djoezeke/mytoml/issues
- *
  *
  */
 
@@ -85,7 +87,7 @@
 /** @} */
 
 //-----------------------------------------------------------------------------
-// [SECTION] Mytoml Header mess
+// [SECTION] Header mess
 //-----------------------------------------------------------------------------
 
 #include <time.h>    //
@@ -98,8 +100,11 @@
 
 #include "khash.h"
 
+#ifdef MYTOML_TESTS
+#endif // MYTOML_TESTS
+
 //-----------------------------------------------------------------------------
-// [SECTION] Configurable macros
+// [SECTION] Configurable Macros
 //-----------------------------------------------------------------------------
 
 /**
@@ -152,7 +157,7 @@
 #define MYTOML_MAX_ARRAY_LENGTH 131072
 
 //-----------------------------------------------------------------------------
-// [SECTION] Mytoml Function Macros
+// [SECTION] Function Macros
 //-----------------------------------------------------------------------------
 
 /**
@@ -178,6 +183,7 @@
  */
 #define tomlLoad(file) _Generic((file), \
     char *: tomlLoadFile,               \
+    const char *: tomlLoadFile,         \
     FILE *: tomlLoadFILE)(file)
 
 /**
@@ -210,9 +216,11 @@
 #define tomlValueDump(object, file) _Generic((object), \
     TomlKey *: _Generic((file),                        \
             char *: tomlKeyDumpFile,                   \
+            const char *: tomlKeyDumpFile,             \
             FILE *: tomlKeyDumpFILE),                  \
     TomlValue *: _Generic((file),                      \
             char *: tomlValueDumpFile,                 \
+            const char *: tomlValueDumpFile,           \
             FILE *: tomlValueDumpFILE, ))(object, file)
 
 /**
@@ -275,11 +283,8 @@
 
 #endif //__cplusplus
 
-#ifdef MYTOML_TESTS
-#endif // MYTOML_TESTS
-
 //-----------------------------------------------------------------------------
-// [SECTION] Mytoml Import/Export
+// [SECTION] Import/Export
 //-----------------------------------------------------------------------------
 
 /**
@@ -320,7 +325,7 @@
 /** @} */
 
 //-----------------------------------------------------------------------------
-// [SECTION] Mytoml Data Structures
+// [SECTION] Data Structures
 //-----------------------------------------------------------------------------
 
 /**
@@ -367,7 +372,7 @@ typedef enum TomlKeyType_t
  * @brief Enumerates error types for TOML parsing.
  * @details Used to classify errors encountered during parsing or validation.
  */
-typedef enum TomlErrorType_t
+typedef enum TomlErrorType
 {
     TOML_UNKNOWN /**< Unknown error type. */
 } TomlErrorType;
@@ -414,7 +419,7 @@ struct TomlKey_t
     char id[MYTOML_MAX_ID_LENGTH]; /**< Key identifier string. */
     khash_t(str) * subkeys;        /**< Hash map of subkeys. */
     TomlValue *value;              /**< Value associated with this key. */
-    int idx;                       /**< Index for array tables. */
+    size_t idx;                    /**< Index for array tables. */
 };
 
 /** @} */
@@ -432,7 +437,7 @@ struct TomlKey_t
 typedef struct TomlError_t TomlError;
 struct TomlError_t
 {
-    TomlKeyType type;    /**< Type of error. */
+    TomlErrorType type;  /**< Type of error. */
     const char *message; /**< Error message string. */
 };
 
@@ -440,22 +445,14 @@ struct TomlError_t
 
 /** @} */
 
-#ifdef __cplusplus
-
 //-----------------------------------------------------------------------------
-// [SECTION] MyToml C++ Only
+// [SECTION] C Only Functions
 //-----------------------------------------------------------------------------
-
-#endif //__cplusplus
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif //__cplusplus
-
-    //-----------------------------------------------------------------------------
-    // [SECTION] MyToml C Only
-    //-----------------------------------------------------------------------------
 
     /**
      * @name Mytoml
@@ -626,6 +623,14 @@ extern "C"
 
 #ifdef __cplusplus
 }
+#endif //__cplusplus
+
+//-----------------------------------------------------------------------------
+// [SECTION] C++ Only Classes
+//-----------------------------------------------------------------------------
+
+#ifdef __cplusplus
+
 #endif //__cplusplus
 
 #endif // DJOEZEKE_MYTOML_H

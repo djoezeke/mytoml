@@ -4,14 +4,11 @@
 
 #include "mytoml.h"
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif //__cplusplus
+#pragma region Internal
 
-    //-----------------------------------------------------------------------------
-    // [SECTION] MyToml Defines
-    //-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// [SECTION] Defines
+//-----------------------------------------------------------------------------
 
 /**
  * @def LOG_ERR
@@ -105,140 +102,147 @@ extern "C"
         time->tm_sec = num;                         \
     } while (0)
 
-#pragma region Internal
+//-----------------------------------------------------------------------------
+// [SECTION] Data Structures
+//-----------------------------------------------------------------------------
+
+/**
+ * @defgroup Parser Basis Types
+ * @brief Core types and data structures for Parser.
+ * @{
+ */
+
+/*
+    Struct `tokenizer` handles the input stream
+    by reading and returning tokens for the parser.
+    However, this currently returns each character
+    as a token. It allows each state of the parser
+    to determine if it is an acceptable token, and
+    stop parsing as soon as it is not.
+
+    TODO: Refactor to parse tokens instead of characters
+*/
+
+/**
+ * @enum InputType
+ * @brief Enumerates all TOML input types supported by the parser.
+ * @details Used to distinguish between FILE* , char* file and char* string.
+ */
+typedef enum InputType
+{
+
+    I_FILE,  /**< `FILE *` File input type  */
+    I_File,  /**< `basic.toml` File input type */
+    I_STREAM /**< `char *` Stream input type  */
+
+} InputType;
+
+/**
+ * @name Parser Input type
+ * @{
+ */
+
+/**
+ * @struct Input
+ * @brief Represents a TOML input for parser.
+ */
+typedef struct Input
+{
+    InputType type; /**< The file input type. */
+    /** Standard ( `FILE*` or `char *` file) input. */
+    union
+    {
+        const char *name; /**< The `char*` file input filename. */
+        FILE *pointer;    /**< The `FILE*` file input pointer. */
+    } file;
+
+    char *stream; /**< Pointer for storing the input buffer */
+} Input;
+
+/** @} */
+
+/**
+ * @name Parser Input type
+ * @{
+ */
+
+/**
+ * @struct Tokenizer
+ * @brief Represents a TOML parser.
+ */
+typedef struct Tokenizer
+{
+    Input input;
+    int cursor;                      /**< The location in the input buffer */
+    char token;                      /**< The last read in token */
+    char prev;                       /**< The token read in before `token` */
+    char prev_prev;                  /**< The token read in before `prev` */
+    bool is_null;                    /**< Boolean to indicate if `token` is non-NULL */
+    bool newline;                    /**< To keep track if we are on a newline */
+    int line;                        /**< The current line number in the stream */
+    int col;                         /**< The current column number in the stream */
+    int lines[MYTOML_MAX_NUM_LINES]; /**, The array where index=line and lines[index]=length */
+} Tokenizer;
+
+/** @} */
+
+/**
+ * @name Number data type
+ * @{
+ */
+
+/**
+ * @struct Number
+ * @brief Represent parsed number values.
+ * It also stores precision and scientific notation flag for floats,
+ * for testing
+ * @note Used for TOML_INT and TOML_FLOAT value types.
+ * @note number can be either integer or floating-point.
+ */
+typedef struct Number
+{
+    TomlValueType type; /**< */
+    int precision;      /**<  */
+    bool scientific;    /**<  */
+} Number;
+
+/** @} */
+
+/**
+ * @name Datetime data type
+ * @{
+ */
+
+/**
+ * @struct Datetime
+ * @brief Represent a generic type for a parsed datetime values.
+ * number can be either integer or floating-point.
+ * It also stores the matching format, again for compliance testing.
+ * @note Used for DATETIME, DATELOCAL, TIMELOCAL and DATETIMELOCAL value types.
+ */
+typedef struct Datetime
+{
+    struct tm *dt;                       /**  */
+    TomlValueType type;                  /**  */
+    char format[MYTOML_MAX_DATE_FORMAT]; /**  */
+    int millis;                          /**  */
+} Datetime;
+
+/** @} */
+
+/** @} */
+
+//-----------------------------------------------------------------------------
+// [SECTION] C Only Functions
+//-----------------------------------------------------------------------------
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif // __cplusplus
 
     //-----------------------------------------------------------------------------
-    // [SECTION] MyToml Internal Structures
-    //-----------------------------------------------------------------------------
-
-    /**
-     * @defgroup Parser Basis Types
-     * @brief Core types and data structures for Parser.
-     * @{
-     */
-
-    /*
-        Struct `tokenizer` handles the input stream
-        by reading and returning tokens for the parser.
-        However, this currently returns each character
-        as a token. It allows each state of the parser
-        to determine if it is an acceptable token, and
-        stop parsing as soon as it is not.
-
-        TODO: Refactor to parse tokens instead of characters
-    */
-
-    /**
-     * @enum InputType
-     * @brief Enumerates all TOML input types supported by the parser.
-     * @details Used to distinguish between FILE* , char* file and char* string.
-     */
-    typedef enum InputType
-    {
-
-        I_FILE,  /**< `FILE *` File input type  */
-        I_File,  /**< `basic.toml` File input type */
-        I_STREAM /**< `char *` Stream input type  */
-
-    } InputType;
-
-    /**
-     * @name Parser Input type
-     * @{
-     */
-
-    /**
-     * @struct Input
-     * @brief Represents a TOML input for parser.
-     */
-    typedef struct Input
-    {
-        InputType type; /**< The file input type. */
-        /** Standard ( `FILE*` or `char *` file) input. */
-        union
-        {
-            const char *name; /**< The `char*` file input filename. */
-            FILE *pointer;    /**< The `FILE*` file input pointer. */
-        } file;
-
-        char *stream; /**< Pointer for storing the input buffer */
-    } Input;
-
-    /** @} */
-
-    /**
-     * @name Parser Input type
-     * @{
-     */
-
-    /**
-     * @struct Tokenizer
-     * @brief Represents a TOML parser.
-     */
-    typedef struct Tokenizer
-    {
-        Input input;
-        int cursor;                      /**< The location in the input buffer */
-        char token;                      /**< The last read in token */
-        char prev;                       /**< The token read in before `token` */
-        char prev_prev;                  /**< The token read in before `prev` */
-        bool is_null;                    /**< Boolean to indicate if `token` is non-NULL */
-        bool newline;                    /**< To keep track if we are on a newline */
-        int line;                        /**< The current line number in the stream */
-        int col;                         /**< The current column number in the stream */
-        int lines[MYTOML_MAX_NUM_LINES]; /**, The array where index=line and lines[index]=length */
-    } Tokenizer;
-
-    /** @} */
-
-    /**
-     * @name Number data type
-     * @{
-     */
-
-    /**
-     * @struct Number
-     * @brief Represent parsed number values.
-     * It also stores precision and scientific notation flag for floats,
-     * for testing
-     * @note Used for TOML_INT and TOML_FLOAT value types.
-     * @note number can be either integer or floating-point.
-     */
-    typedef struct Number
-    {
-        TomlValueType type; /**< */
-        int precision;      /**<  */
-        bool scientific;    /**<  */
-    } Number;
-
-    /** @} */
-
-    /**
-     * @name Datetime data type
-     * @{
-     */
-
-    /**
-     * @struct Datetime
-     * @brief Represent a generic type for a parsed datetime values.
-     * number can be either integer or floating-point.
-     * It also stores the matching format, again for compliance testing.
-     * @note Used for DATETIME, DATELOCAL, TIMELOCAL and DATETIMELOCAL value types.
-     */
-    typedef struct Datetime
-    {
-        struct tm *dt;                       /**  */
-        TomlValueType type;                  /**  */
-        char format[MYTOML_MAX_DATE_FORMAT]; /**  */
-        int millis;                          /**  */
-    } Datetime;
-
-    /** @} */
-
-    /** @} */
-
-    //-----------------------------------------------------------------------------
-    // [SECTION] MyToml Function Declarations
+    // [SECTION] Declarations
     //-----------------------------------------------------------------------------
 
     // Helper function to append formatted text to a string buffer
@@ -576,7 +580,7 @@ extern "C"
     TomlValue *_Mytoml_ParseValue(Tokenizer *tok, const char *num_end);
 
     //-----------------------------------------------------------------------------
-    // [SECTION] MyToml Function Definations
+    // [SECTION] Definations
     //-----------------------------------------------------------------------------
 
     void _Mytoml_AppendToBuffer(char **buffer, size_t *size, const char *format, ...)
@@ -718,7 +722,11 @@ extern "C"
     bool _Mytoml_TokenizerLoadInput(Tokenizer *tok)
     {
         FILE *stream;
-        if (tok->input.type == I_FILE)
+        if (tok->input.type == I_STREAM)
+        {
+            return true;
+        }
+        else if (tok->input.type == I_FILE)
         {
             stream = tok->input.file.pointer;
         }
@@ -730,14 +738,17 @@ extern "C"
         {
             stream = stdin;
         }
+
         fseek(stream, 0L, SEEK_END);
         long size = ftell(stream);
         fseek(stream, 0L, SEEK_SET);
+
         if (size >= MYTOML_MAX_FILE_SIZE)
         {
             LOG_ERR("input size is too big\n");
             return false;
         }
+
         char *buffer = calloc(1, size + 1);
         if (size > 0 && 1 != fread(buffer, size, 1, stream))
         {
@@ -1115,17 +1126,15 @@ extern "C"
     bool _Mytoml_IsControlLiteral(char c)
     {
         return (
-            (c != 0x9) &&
-                (c != 0xA) &&
-                (c >= 0x0 && c <= 0x1F) ||
+            ((c != 0x9) &&
+             (c != 0xA) &&
+             (c >= 0x0 && c <= 0x1F)) ||
             (c == 0x7F));
     }
 
-    bool _Mytoml_IsNumberEnd(
-        char c,
-        const char *end)
+    bool _Mytoml_IsNumberEnd(char c, const char *end)
     {
-        for (int i = 0; i < strlen(end); i++)
+        for (size_t i = 0; i < strlen(end); i++)
         {
             if (c == end[i])
                 return true;
@@ -1827,11 +1836,11 @@ extern "C"
                     RETURN_IF_FAILED(_Mytoml_IsValidDatetime(time), "specified offset datetime is not valid\n");
 
                     CHECK_DATETIME(off_h, 2, "invalid offset hour\n");
-                    RETURN_IF_FAILED((num >= 0 && num <= 23), "invalid offset hour\n");
+                    RETURN_IF_FAILED((num >= 0Ul && num <= 23Ul), "invalid offset hour\n");
                     // TODO : Fix
                     //  time->tm_gmtoff = num * 60 * 60;
                     CHECK_DATETIME(off_m, 2, "invalid offset minute\n");
-                    RETURN_IF_FAILED((num >= 0 && num <= 59), "invalid offset minute\n");
+                    RETURN_IF_FAILED((num >= 0Ul && num <= 59Ul), "invalid offset minute\n");
                     // TODO : Fix
                     //  time->tm_gmtoff += num;
 
@@ -1862,8 +1871,7 @@ extern "C"
                     int sz = strlen("%Y-%m-%dT%H:%M:%S.-HH:MM") + mlen + 1;
                     FUNC_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, free, dt);
                     RETURN_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, "datetime string is too long");
-                    int c = snprintf(dt->format, sz, "%%Y-%%m-%%dT%%H:%%M:%%S.%d%c%s:%s",
-                                     millis, off_s[0], off_h, off_m);
+                    snprintf(dt->format, sz, "%%Y-%%m-%%dT%%H:%%M:%%S.%d%c%s:%s", millis, off_s[0], off_h, off_m);
                     return dt;
                 }
                 // DATETIME with offset
@@ -1905,8 +1913,7 @@ extern "C"
                     int sz = strlen("%Y-%m-%dT%H:%M:%S-HH:MM") + 1;
                     FUNC_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, free, dt);
                     RETURN_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, "datetime string is too long");
-                    int c = snprintf(dt->format, sz, "%%Y-%%m-%%dT%%H:%%M:%%S%c%s:%s",
-                                     off_s[0], off_h, off_m);
+                    snprintf(dt->format, sz, "%%Y-%%m-%%dT%%H:%%M:%%S%c%s:%s", off_s[0], off_h, off_m);
                     return dt;
                 }
                 // DATETIME with millisecond and timezone
@@ -1947,7 +1954,7 @@ extern "C"
                     int sz = strlen("%Y-%m-%dT%H:%M:%S.Z") + mlen + 1;
                     FUNC_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, free, dt);
                     RETURN_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, "datetime string is too long");
-                    int c = snprintf(dt->format, sz, "%%Y-%%m-%%dT%%H:%%M:%%S.%dZ", millis);
+                    snprintf(dt->format, sz, "%%Y-%%m-%%dT%%H:%%M:%%S.%dZ", millis);
                     return dt;
                 }
                 // DATETIMELOCAL with millisecond
@@ -1984,7 +1991,7 @@ extern "C"
                     int sz = strlen("%Y-%m-%dT%H:%M:%S.") + mlen + 1;
                     FUNC_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, free, dt);
                     RETURN_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, "datetime string is too long");
-                    int c = snprintf(dt->format, sz, "%%Y-%%m-%%dT%%H:%%M:%%S.%d", millis);
+                    snprintf(dt->format, sz, "%%Y-%%m-%%dT%%H:%%M:%%S.%d", millis);
                     return dt;
                 }
                 // DATETIME with timezone
@@ -2023,7 +2030,7 @@ extern "C"
                     int sz = strlen("%Y-%m-%dT%H:%M:%SZ") + 1;
                     FUNC_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, free, dt);
                     RETURN_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, "datetime string is too long");
-                    int c = snprintf(dt->format, sz, "%%Y-%%m-%%dT%%H:%%M:%%SZ");
+                    snprintf(dt->format, sz, "%%Y-%%m-%%dT%%H:%%M:%%SZ");
                     return dt;
                 }
                 // DATETIMELOCAL
@@ -2103,7 +2110,7 @@ extern "C"
                     int sz = strlen("%H:%M:%S.") + mlen + 1;
                     FUNC_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, free, dt);
                     RETURN_IF_FAILED(sz < MYTOML_MAX_DATE_FORMAT, "datetime string is too long");
-                    int c = snprintf(dt->format, sz, "%%H:%%M:%%S.%d", millis);
+                    snprintf(dt->format, sz, "%%H:%%M:%%S.%d", millis);
                     return dt;
                 }
                 // TIMELOCAL
@@ -2401,10 +2408,7 @@ extern "C"
         return false;
     }
 
-    int _Mytoml_ParseUnicode(
-        Tokenizer *tok,
-        char *escaped,
-        int len)
+    int _Mytoml_ParseUnicode(Tokenizer *tok, char *escaped, int len)
     {
         int digits = 0;
         char code[9] = {0};
@@ -2440,7 +2444,7 @@ extern "C"
                 if ((num >= 0x0 && num <= 0xD7FF) || (num >= 0xE000 && num <= 0x10FFFF))
                 {
                     // UTF-8 encoding
-                    if (num >= 0x0 && num <= 0x7F)
+                    if (num <= 0x0 && num <= 0x7F)
                     {
                         if (len < 1)
                         {
@@ -2570,12 +2574,7 @@ extern "C"
         return 0;
     }
 
-    double
-    _Mytoml_ParseBaseUnit(
-        Tokenizer *tok,
-        int base,
-        char *value,
-        const char *num_end)
+    double _Mytoml_ParseBaseUnit(Tokenizer *tok, int base, char *value, const char *num_end)
     {
         int idx = 0;
         double d = -1;
@@ -2942,13 +2941,38 @@ extern "C"
         return NULL;
     }
 
-#pragma endregion // Mytoml Internal
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
-#pragma region MyToml API
+//-----------------------------------------------------------------------------
+// [SECTION] C++ Only Classes
+//-----------------------------------------------------------------------------
 
-    //-----------------------------------------------------------------------------
-    // [SECTION] MyToml Main
-    //-----------------------------------------------------------------------------
+#ifdef __cplusplus
+
+//-----------------------------------------------------------------------------
+// [SECTION] Declarations
+//-----------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
+// [SECTION] Definations
+//-----------------------------------------------------------------------------
+
+#endif //__cplusplus
+
+#pragma endregion
+
+#pragma region MyToml
+
+//-----------------------------------------------------------------------------
+// [SECTION] C Only Functions
+//-----------------------------------------------------------------------------
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif // __cplusplus
 
     MYTOML_API TomlKey *tomlLoadFile(char *file)
     {
@@ -2958,7 +2982,7 @@ extern "C"
         Input input = {.type = I_File, .file.name = file};
         Tokenizer *tok = _Mytoml_NewTokenizer(input);
         bool ok = _Mytoml_TokenizerLoadInput(tok);
-        RETURN_IF_FAILED(ok, "Failed to load input from %s\n", file);
+        RETURN_IF_FAILED(ok, "Failed to load input from %s\n", input.file.name);
         _Mytoml_NextTokenizerToken(tok);
 
         int line, col;
@@ -3013,7 +3037,7 @@ extern "C"
         TomlKey *root = _Mytoml_NewKey(TOML_TABLE);
         memcpy(root->id, "root", strlen("root"));
 
-        Input input = {.type = I_STREAM, .stream = toml};
+        Input input = {.type = I_STREAM, .stream = strdup(toml)};
         Tokenizer *tok = _Mytoml_NewTokenizer(input);
         _Mytoml_NextTokenizerToken(tok);
 
@@ -3389,8 +3413,16 @@ extern "C"
         return NULL;
     }
 
-#pragma endregion // Mytoml API
-
 #ifdef __cplusplus
 }
+#endif // __cplusplus
+
+//-----------------------------------------------------------------------------
+// [SECTION] C++ Only Classes
+//-----------------------------------------------------------------------------
+
+#ifdef __cplusplus
+
 #endif //__cplusplus
+
+#pragma endregion

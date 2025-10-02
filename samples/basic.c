@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
     char *file = NULL;
     if (argc > 1)
         file = argv[1];
-    TomlKey *toml = tomlLoad(file);
+    TomlKey *toml = tomlLoadFile(file);
     if (toml == NULL)
         return 1;
     // char *buffer = "";
