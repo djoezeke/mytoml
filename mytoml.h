@@ -36,6 +36,8 @@
  *  [SECTION] Header mess
  *  [SECTION] Configurable macros
  *  [SECTION] Function Macros
+ *  [SECTION] Platform Defines
+ *  [SECTION] Compiler Defines
  *  [SECTION] Imports/Exports
  *  [SECTION] Data Structures
  *  [SECTION] C Only Functions
@@ -90,15 +92,17 @@
 // [SECTION] Header mess
 //-----------------------------------------------------------------------------
 
-#include <time.h>    //
-#include <math.h>    //
-#include <stdio.h>   // for printf
-#include <stdarg.h>  //
-#include <stdlib.h>  // for realloc
-#include <string.h>  // for strdup strlen
+#include "khash.h"
+#include <stdio.h>   // for FILE
 #include <stdbool.h> //
 
-#include "khash.h"
+#ifdef __cplusplus
+
+/** C++ Exclusive headers. */
+#include <exception>
+#include <iostream>
+
+#endif //__cplusplus
 
 #ifdef MYTOML_TESTS
 #endif // MYTOML_TESTS
@@ -275,13 +279,174 @@
     TomlKey *: tomlKeyDumpBuffer,                               \
     TomlValue *: tomlValueDumpBuffer)(object, buffer, size)
 
-#ifdef __cplusplus
+//-----------------------------------------------------------------------------
+// [SECTION] Platform
+//-----------------------------------------------------------------------------
 
-/** C++ Exclusive headers. */
-#include <exception>
-#include <iostream>
+/**
+ * @defgroup platform Platform Definitions
+ * @{
+ */
 
-#endif //__cplusplus
+/**
+ * @brief   Checks if the compiler is of given brand.
+ * @param   name Platform, like `APPLE`.
+ * @retval  true   It is.
+ * @retval  false  It isn't.
+ */
+#define MYTOML_PLATFORM_IS(name) MYTOML_PLATFORM_IS_##name
+
+/**
+ * @brief  Returns the current platform name.
+ * @return  platform name.
+ */
+
+#ifdef __APPLE__
+/**
+ * A preprocessor macro that is only defined if compiling for MacOS.
+ */
+#define MYTOML_PLATFORM_IS_APPLE 1
+/**
+ * @brief  Returns the current platform name.
+ * @return  platform name.
+ */
+#define MYTOML_PLATFORM_NAME_IS "Apple"
+#elif defined(linux) || defined(__linux) || defined(__linux__)
+/**
+ * A preprocessor macro that is only defined if compiling for Linux.
+ */
+#define MYTOML_PLATFORM_IS_LINUX 1
+/**
+ * @brief  Returns the current platform name.
+ * @return  platform name.
+ */
+#define MYTOML_PLATFORM_NAME_IS "Linux"
+#elif defined(WIN32) || defined(__WIN32__) || defined(_WIN32) || defined(_MSC_VER) || defined(__MINGW32__)
+/**
+ * A preprocessor macro that is only defined if compiling for Windows.
+ */
+#define MYTOML_PLATFORM_IS_WINDOWS 1
+/**
+ * @brief  Returns the current platform name.
+ * @return  platform name.
+ */
+#define MYTOML_PLATFORM_NAME_IS "Windows"
+#else
+/**
+ * A preprocessor macro that is only defined if compiling for others.
+ */
+#define MYTOML_PLATFORM_IS_OTHERS 1
+/**
+ * @brief  Returns the current platform name.
+ * @return  platform name.
+ */
+#define MYTOML_PLATFORM_NAME_IS "Others"
+#endif
+
+/** @} */
+
+//-----------------------------------------------------------------------------
+// [SECTION] Compiler
+//-----------------------------------------------------------------------------
+
+/**
+ * @defgroup compiler Compiler Definitions
+ * @{
+ */
+
+/**
+ * @brief   Checks if the compiler is of given brand.
+ * @param   name  Compiler brand, like `MSVC`.
+ * @retval  true   It is.
+ * @retval  false  It isn't.
+ */
+#define MYTOML_COMPILER_IS(name) MYTOML_COMPILER_IS_##name
+
+/// Compiler is apple
+#if !defined(__clang__)
+#define MYTOML_COMPILER_IS_APPLE 0
+#elif !defined(__apple_build_version__)
+#define MYTOML_COMPILER_IS_APPLE 0
+#else
+#define MYTOML_COMPILER_IS_APPLE 1
+#define MYTOML_COMPILER_VERSION_MAJOR __clang_major__
+#define MYTOML_COMPILER_VERSION_MINOR __clang_minor__
+#define MYTOML_COMPILER_VERSION_PATCH __clang_patchlevel__
+#endif
+
+/// Compiler is clang
+#if !defined(__clang__)
+#define MYTOML_COMPILER_IS_CLANG 0
+#elif MYTOML_COMPILER_IS(APPLE)
+#define MYTOML_COMPILER_IS_CLANG 0
+#else
+#define MYTOML_COMPILER_IS_CLANG 1
+#define MYTOML_COMPILER_VERSION_MAJOR __clang_major__
+#define MYTOML_COMPILER_VERSION_MINOR __clang_minor__
+#define MYTOML_COMPILER_VERSION_PATCH __clang_patchlevel__
+#endif
+
+/// Compiler is intel
+#if !defined(__INTEL_COMPILER)
+#define MYTOML_COMPILER_IS_INTEL 0
+#elif !defined(__INTEL_COMPILER_UPDATE)
+#define MYTOML_COMPILER_IS_INTEL 1
+/* __INTEL_COMPILER = XXYZ */
+#define MYTOML_COMPILER_VERSION_MAJOR (__INTEL_COMPILER / 100)
+#define MYTOML_COMPILER_VERSION_MINOR (__INTEL_COMPILER % 100 / 10)
+#define MYTOML_COMPILER_VERSION_PATCH (__INTEL_COMPILER % 10)
+#else
+#define MYTOML_COMPILER_IS_INTEL 1
+/* __INTEL_COMPILER = XXYZ */
+#define MYTOML_COMPILER_VERSION_MAJOR (__INTEL_COMPILER / 100)
+#define MYTOML_COMPILER_VERSION_MINOR (__INTEL_COMPILER % 100 / 10)
+#define MYTOML_COMPILER_VERSION_PATCH __INTEL_COMPILER_UPDATE
+#endif
+
+/// Compiler is msc
+#if !defined(_MSC_VER)
+#define MYTOML_COMPILER_IS_MSVC 0
+#elif MYTOML_COMPILER_IS(CLANG)
+#define MYTOML_COMPILER_IS_MSVC 0
+#elif MYTOML_COMPILER_IS(INTEL)
+#define MYTOML_COMPILER_IS_MSVC 0
+#elif _MSC_VER >= 1400
+#define MYTOML_COMPILER_IS_MSVC 1
+/* _MSC_FULL_VER = XXYYZZZZZ */
+#define MYTOML_COMPILER_VERSION_MAJOR (_MSC_FULL_VER / 10000000)
+#define MYTOML_COMPILER_VERSION_MINOR (_MSC_FULL_VER % 10000000 / 100000)
+#define MYTOML_COMPILER_VERSION_PATCH (_MSC_FULL_VER % 100000)
+#elif defined(_MSC_FULL_VER)
+#define MYTOML_COMPILER_IS_MSVC 1
+/* _MSC_FULL_VER = XXYYZZZZ */
+#define MYTOML_COMPILER_VERSION_MAJOR (_MSC_FULL_VER / 1000000)
+#define MYTOML_COMPILER_VERSION_MINOR (_MSC_FULL_VER % 1000000 / 10000)
+#define MYTOML_COMPILER_VERSION_PATCH (_MSC_FULL_VER % 10000)
+#else
+#define MYTOML_COMPILER_IS_MSVC 1
+/* _MSC_VER = XXYY */
+#define MYTOML_COMPILER_VERSION_MAJOR (_MSC_VER / 100)
+#define MYTOML_COMPILER_VERSION_MINOR (_MSC_VER % 100)
+#define MYTOML_COMPILER_VERSION_PATCH 0
+#endif
+
+/// Compiler is gcc
+#if !defined(__GNUC__)
+#define MYTOML_COMPILER_IS_GCC 0
+#elif MYTOML_COMPILER_IS(APPLE)
+#define MYTOML_COMPILER_IS_GCC 0
+#elif MYTOML_COMPILER_IS(CLANG)
+#define MYTOML_COMPILER_IS_GCC 0
+#elif MYTOML_COMPILER_IS(INTEL)
+#define MYTOML_COMPILER_IS_GCC 0
+#else
+#define MYTOML_COMPILER_IS_GCC 1
+#define MYTOML_COMPILER_VERSION_MAJOR __GNUC__
+#define MYTOML_COMPILER_VERSION_MINOR __GNUC_MINOR__
+#define MYTOML_COMPILER_VERSION_PATCH __GNUC_PATCHLEVEL__
+#endif
+
+/** @} */
 
 //-----------------------------------------------------------------------------
 // [SECTION] Import/Export
@@ -374,7 +539,27 @@ typedef enum TomlKeyType_t
  */
 typedef enum TomlErrorType
 {
-    TOML_UNKNOWN /**< Unknown error type. */
+    /**
+     * @name Toml error types
+     * @{
+     */
+
+    TOML_UNKNOWN = -1, /**< An unknown error type. */
+    TOML_DECODE,       /**< Cannot decode the input stream. */
+    TOML_ENCODE,       /**< Cannot encode the input stream. */
+    TOML_MEMORY,       /**< Cannot allocate or reallocate a block of memory. */
+    TOML_READ,         /**< Cannot read from the input stream. */
+    TOML_WRITE,        /**< Cannot write to the output stream. */
+    TOML_CAST,         /**< Cannot cast value to type. */
+
+    KEY_ALREADY_EXISTS,
+    MISSING_SEPARATOR,
+    WRONG_TYPE_CAST,
+    MISSING_VALUE,
+    KEY_NOT_FOUND,
+
+    /** @} */
+
 } TomlErrorType;
 
 /**
@@ -431,15 +616,16 @@ struct TomlKey_t
 
 /**
  * @struct TomlError
- * @brief Represents an error encountered during TOML parsing.
+ * @brief Represents an error encountered.
  * @details Contains error type and message for diagnostics.
  */
-typedef struct TomlError_t TomlError;
-struct TomlError_t
+typedef struct TomlError_t
 {
     TomlErrorType type;  /**< Type of error. */
     const char *message; /**< Error message string. */
-};
+    int line;            /**< Line the error occured  */
+    int column;          /**< Column the error occured  */
+} TomlError_t;
 
 /** @} */
 
@@ -630,6 +816,35 @@ extern "C"
 //-----------------------------------------------------------------------------
 
 #ifdef __cplusplus
+
+/**
+ * @class TomlError
+ * @brief TomlError class for Toml-related errors.
+ */
+class TomlError : public std::exception
+{
+public:
+    /**
+     * @brief Constructs an exception with a specific error type.
+     * @param type The type of the error.
+     */
+    TomlError(TomlError_t type);
+
+    /**
+     * @brief Gets the error message.
+     * @return The error message.
+     */
+    const char *what() const noexcept override;
+
+    /**
+     * @brief Gets the error type.
+     * @return The error type.
+     */
+    TomlErrorType type() const noexcept;
+
+private:
+    TomlError_t m_Error; /**< The error type. */
+};
 
 #endif //__cplusplus
 

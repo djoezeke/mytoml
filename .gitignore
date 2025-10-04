@@ -1,3 +1,5 @@
 /build*
 /.vscode/
 /.vs/
+**/Cmakelistss.txt
+**/READMEE.md

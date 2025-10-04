@@ -3,6 +3,13 @@
 //-------------------------------------------------------------------------
 
 #include "mytoml.h"
+#include <time.h>    //
+#include <math.h>    //
+#include <stdio.h>   // for printf
+#include <stdarg.h>  //
+#include <stdlib.h>  // for realloc
+#include <string.h>  // for strdup strlen
+#include <stdbool.h> //
 
 #pragma region Internal
 
@@ -149,7 +156,7 @@ typedef enum InputType
 typedef struct Input
 {
     InputType type; /**< The file input type. */
-    /** Standard ( `FILE*` or `char *` file) input. */
+                    /** Standard ( `FILE*` or `char *` file) input. */
     union
     {
         const char *name; /**< The `char*` file input filename. */
@@ -638,7 +645,7 @@ extern "C"
 
     Tokenizer *_Mytoml_NewTokenizer(Input input)
     {
-        Tokenizer *tok = calloc(1, sizeof(Tokenizer));
+        Tokenizer *tok = (Tokenizer *)calloc(1, sizeof(Tokenizer));
         tok->input = input;
         tok->cursor = 0;
         tok->token = '\0';
@@ -749,7 +756,7 @@ extern "C"
             return false;
         }
 
-        char *buffer = calloc(1, size + 1);
+        char *buffer = (char *)calloc(1, size + 1);
         if (size > 0 && 1 != fread(buffer, size, 1, stream))
         {
             LOG_ERR("could not read input\n");
@@ -793,7 +800,7 @@ extern "C"
 
     TomlValue *_Mytoml_NewStringValue(const char *s)
     {
-        TomlValue *v = calloc(1, sizeof(TomlValue));
+        TomlValue *v = (TomlValue *)calloc(1, sizeof(TomlValue));
         v->type = TOML_STRING;
         v->data = calloc(1, strlen(s) + 1);
         memcpy(v->data, s, strlen(s));
@@ -802,7 +809,7 @@ extern "C"
 
     TomlValue *_Mytoml_NewNumberValue(double *d, TomlValueType type, size_t precision, bool scientific)
     {
-        TomlValue *v = calloc(1, sizeof(TomlValue));
+        TomlValue *v = (TomlValue *)calloc(1, sizeof(TomlValue));
         v->type = type;
         v->scientific = scientific;
         v->precision = precision;
@@ -814,7 +821,7 @@ extern "C"
     TomlValue *
     _Mytoml_NewDatetimeValue(struct tm *dt, TomlValueType type, char *format, int millis)
     {
-        TomlValue *v = calloc(1, sizeof(TomlValue));
+        TomlValue *v = (TomlValue *)calloc(1, sizeof(TomlValue));
         v->type = type;
         v->precision = millis;
         v->data = calloc(1, sizeof(struct tm));
@@ -829,16 +836,16 @@ extern "C"
 
     TomlValue *_Mytoml_NewArrayValue()
     {
-        TomlValue *v = calloc(1, sizeof(TomlValue));
+        TomlValue *v = (TomlValue *)calloc(1, sizeof(TomlValue));
         v->type = TOML_ARRAY;
-        v->arr = calloc(1, sizeof(TomlValue *) * MYTOML_MAX_ARRAY_LENGTH);
+        v->arr = (TomlValue **)calloc(1, sizeof(TomlValue *) * MYTOML_MAX_ARRAY_LENGTH);
         v->len = 0;
         return v;
     }
 
     TomlValue *_Mytoml_NewTableValue(TomlKey *k)
     {
-        TomlValue *v = calloc(1, sizeof(TomlValue));
+        TomlValue *v = (TomlValue *)calloc(1, sizeof(TomlValue));
         v->type = TOML_INLINETABLE;
         TomlKey *h = _Mytoml_NewKey(TOML_KEY);
         for (khiter_t ki = kh_begin(k->subkeys);
@@ -879,7 +886,7 @@ extern "C"
 
     TomlKey *_Mytoml_NewKey(TomlKeyType type)
     {
-        TomlKey *k = calloc(1, sizeof(TomlKey));
+        TomlKey *k = (TomlKey *)calloc(1, sizeof(TomlKey));
         k->type = type;
         k->value = NULL;
         k->idx = -1;
@@ -929,8 +936,7 @@ extern "C"
                 // and re-defining an ARRAYTABLE means adding another map
                 // of key-value to the list, we use the `value->arr`
                 // attribute of the key to store each map of key-values
-                TomlKey *a = _Mytoml_AddSubKey(key->value->arr[key->idx]->data,
-                                               subkey);
+                TomlKey *a = _Mytoml_AddSubKey((TomlKey *)key->value->arr[key->idx]->data, subkey);
                 return a;
             }
             else
@@ -1863,7 +1869,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("YYYY-mm-DDTHH:MM:SS.-HH:MM") + mlen + spaces)),
                                      "datetime has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(Datetime));
+                    dt = (Datetime *)calloc(1, sizeof(Datetime));
                     dt->type = TOML_DATETIME;
                     dt->dt = time;
                     mlen = (mlen > 3) ? mlen : 3;
@@ -1907,7 +1913,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("YYYY-mm-DDTHH:MM:SS-HH:MM") + spaces)),
                                      "datetime has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(Datetime));
+                    dt = (Datetime *)calloc(1, sizeof(Datetime));
                     dt->type = TOML_DATETIME;
                     dt->dt = time;
                     int sz = strlen("%Y-%m-%dT%H:%M:%S-HH:MM") + 1;
@@ -1946,7 +1952,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("YYYY-mm-DDTHH:MM:SS.Z") + mlen + spaces)),
                                      "datetime has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(Datetime));
+                    dt = (Datetime *)calloc(1, sizeof(Datetime));
                     dt->type = TOML_DATETIME;
                     dt->dt = time;
                     mlen = (mlen > 3) ? mlen : 3;
@@ -1983,7 +1989,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("YYYY-mm-DDTHH:MM:SS.") + mlen + spaces)),
                                      "datetime has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(Datetime));
+                    dt = (Datetime *)calloc(1, sizeof(Datetime));
                     dt->type = TOML_DATETIMELOCAL;
                     dt->dt = time;
                     mlen = (mlen > 3) ? mlen : 3;
@@ -2024,7 +2030,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("YYYY-mm-DDTHH:MM:SSZ") + spaces)),
                                      "datetime has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(Datetime));
+                    dt = (Datetime *)calloc(1, sizeof(Datetime));
                     dt->type = TOML_DATETIME;
                     dt->dt = time;
                     int sz = strlen("%Y-%m-%dT%H:%M:%SZ") + 1;
@@ -2053,7 +2059,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("YYYY-mm-DDTHH:MM:SS") + spaces)),
                                      "datetime has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(Datetime));
+                    dt = (Datetime *)calloc(1, sizeof(Datetime));
                     dt->type = TOML_DATETIMELOCAL;
                     dt->dt = time;
                     int sz = strlen("%Y-%m-%dT%H:%M:%S");
@@ -2073,7 +2079,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("YYYY-mm-DD") + spaces)),
                                      "date has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(Datetime));
+                    dt = (Datetime *)calloc(1, sizeof(Datetime));
                     dt->type = TOML_DATELOCAL;
                     dt->dt = time;
                     int sz = strlen("%Y-%m-%d");
@@ -2102,7 +2108,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("HH:MM:SS.") + mlen + spaces)),
                                      "time has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(Datetime));
+                    dt = (Datetime *)calloc(1, sizeof(Datetime));
                     dt->type = TOML_TIMELOCAL;
                     dt->dt = time;
                     mlen = (mlen > 3) ? mlen : 3;
@@ -2127,7 +2133,7 @@ extern "C"
                     RETURN_IF_FAILED((strlen(value) == (strlen("HH:MM:SS") + spaces)),
                                      "time has incorrect number of characters\n");
 
-                    dt = calloc(1, sizeof(Datetime));
+                    dt = (Datetime *)calloc(1, sizeof(Datetime));
                     dt->type = TOML_TIMELOCAL;
                     dt->dt = time;
                     int sz = strlen("%H:%M:%S");
@@ -2856,7 +2862,7 @@ extern "C"
                 if (_Mytoml_TokenizerHasToken(tok) && _Mytoml_TokenizerGetToken(tok) == ':')
                 {
                     _Mytoml_TokenizerBacktrace(tok, a + b);
-                    struct tm *time = calloc(1, sizeof(struct tm));
+                    struct tm *time = (struct tm *)calloc(1, sizeof(struct tm));
                     Datetime *dt = _Mytoml_ParseDatetime(tok, value, num_end, time);
                     FUNC_IF_FAILED(dt, free, time);
                     RETURN_IF_FAILED(dt, "could not parse time\n");
@@ -2876,7 +2882,7 @@ extern "C"
                     if (_Mytoml_TokenizerHasToken(tok) && _Mytoml_TokenizerGetToken(tok) == '-')
                     {
                         _Mytoml_TokenizerBacktrace(tok, a + b + c + d);
-                        struct tm *time = calloc(1, sizeof(struct tm));
+                        struct tm *time = (struct tm *)calloc(1, sizeof(struct tm));
                         Datetime *dt = _Mytoml_ParseDatetime(tok, value, num_end, time);
                         FUNC_IF_FAILED(dt, free, time);
                         RETURN_IF_FAILED(dt, "could not parse datetime\n");
@@ -2890,8 +2896,8 @@ extern "C"
                         _Mytoml_TokenizerBacktrace(tok, a + b + c + d);
                     }
                 }
-                double *d = calloc(1, sizeof(double));
-                Number *num = calloc(1, sizeof(Number));
+                double *d = (double *)calloc(1, sizeof(double));
+                Number *num = (Number *)calloc(1, sizeof(Number));
                 Number *n = _Mytoml_ParseNumber(tok, value, d, num_end, num);
                 FUNC_IF_FAILED(n, free, d);
                 FUNC_IF_FAILED(n, free, n);
@@ -3422,6 +3428,21 @@ extern "C"
 //-----------------------------------------------------------------------------
 
 #ifdef __cplusplus
+
+TomlError::TomlError(TomlError_t error)
+{
+    m_Error = {.type = error.type, .message = strdup(error.message), .line = error.line, .column = error.column};
+};
+
+const char *TomlError::what() const noexcept
+{
+    return m_Error.message;
+};
+
+TomlErrorType TomlError::type() const noexcept
+{
+    return m_Error.type;
+};
 
 #endif //__cplusplus
 
