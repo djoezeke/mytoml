@@ -5,6 +5,8 @@ project(Mytoml-Tests)
 # Basic Test Configures   
 #--------------------------------------------------------------------
 
+include(CMakeParseArguments)
+
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Debug)
 endif()
@@ -15,39 +17,71 @@ endif()
 
 include_directories("." "../")
 
-set(MYTOML_TEST_LIB_NAME ${MYTOML_LIB_NAME}-d)
+#--------------------------------------------------------------------
+# Add Test Function
+#--------------------------------------------------------------------
 
-option(BUILD_SHARED_LIBS "Build shared libraries" ON)
-add_library(${MYTOML_TEST_LIB_NAME} ../${MYTOML_SOURCES})
+# add a new target which is a MYTOML test
+# example: 
+#   mytoml_add_test(mytoml-test basic.cpp ... libmytoml)
+#   mytoml_add_test(mytoml-test SHARED basic.cpp ... mytoml)
+function(mytoml_add_test target SOURCES DEPENDS)
 
-target_include_directories(${MYTOML_TEST_LIB_NAME} 
-    PUBLIC 
-        $<BUILD_INTERFACE:${MYTOML_INCLUDE_BUILD_DIR}>
-)
+    # set a source group for the source files
+    source_group("" FILES ${SOURCES})
 
-set_target_properties(${MYTOML_TEST_LIB_NAME} 
-    PROPERTIES DEFINE_SYMBOL MYTOML_BUILD_SHARED
+    # create the target
+    add_executable(${target} ${SOURCES})
+
+    # set the debug suffix
+    set_target_properties(${target} PROPERTIES DEBUG_POSTFIX -d)
+
+    # set the target's folder (for IDEs that support it, e.g. Visual Studio)
+    set_target_properties(${target} PROPERTIES FOLDER "Tests")
+
+    # set the target C/C++ standard.
+    set_property(TARGET ${target} PROPERTY C_STANDARD 17)
+    set_property(TARGET ${target} PROPERTY CXX_STANDARD 17)
+
+    set_target_properties(${target} PROPERTIES
+        VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} # set the Visual Studio startup path for debugging
+        VS_DEBUGGER_COMMAND_ARGUMENTS "-b" # Break into debugger
+
+        XCODE_GENERATE_SCHEME ON # Required to set arguments
+        XCODE_SCHEME_ARGUMENTS "-b" # Break into debugger
     )
+
+    if(ARGS_SHARED)
+      set_target_properties(${target} PROPERTIES DEFINE_SYMBOL MYTOML_IMPORT)
+    endif()
+
+    # link the target to its dependencies
+    target_link_libraries(${target} PRIVATE ${DEPENDS})
+
+    # Enable support for UTF-8 characters in source code
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /utf-8)
+    endif()
+
+    # Add the test
+  add_test(NAME ${target} COMMAND ${target})
+
+endfunction()
 
 #--------------------------------------------------------------------
 # Test Functions
 #--------------------------------------------------------------------
 
-function(add_c_test NAME)
-  add_executable(${NAME} ${NAME}.c)
-  target_link_libraries(${NAME} PRIVATE ${MYTOML_LIB_NAME})
-  set_property(TARGET ${NAME} PROPERTY C_STANDARD 17)
-  set_target_properties(${NAME} PROPERTIES DEFINE_SYMBOL MYTOML_IMPORT)
-  add_test(NAME ${NAME} COMMAND ${NAME})
+function(add_test_default target sourcefiles)
+  mytoml_add_test(${target} ${sourcefiles} "${MYTOML_LIB_NAME}")
 endfunction()
 
-function(add_cpp_test NAME)
-  add_executable(${NAME} ${NAME}.cpp)
-  target_link_libraries(${NAME} PRIVATE ${MYTOML_LIB_NAME})
-  set_property(TARGET ${NAME} PROPERTY CXX_STANDARD 17)
-  set_target_properties(${NAME} PROPERTIES DEFINE_SYMBOL MYTOML_IMPORT)
-  add_test(NAME ${NAME} COMMAND ${NAME})
+function(add_test_debug target sourcefiles)
+  if(MYTOML_BUILD_DEBUG)
+  mytoml_add_test(${target} ${sourcefiles} "${MYTOML_LIB_NAME}-d")
+  endif()
 endfunction()
+
 
 #--------------------------------------------------------------------
 # Recursively add Tests
@@ -57,12 +91,11 @@ endfunction()
 file(GLOB C_TEST_SOURCES "*.c")
 foreach(TEST_FILE ${C_TEST_SOURCES})
   get_filename_component(TEST_NAME ${TEST_FILE} NAME_WE)
-  add_c_test(${TEST_NAME})
 endforeach()
 
 # Automatically add all .cpp tests in this folder
 file(GLOB CPP_TEST_SOURCES "*.cpp")
 foreach(TEST_FILE ${CPP_TEST_SOURCES})
   get_filename_component(TEST_NAME ${TEST_FILE} NAME_WE)
-  add_cpp_test(${TEST_NAME})
 endforeach()
+

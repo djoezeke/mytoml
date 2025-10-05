@@ -38,6 +38,7 @@
  *  [SECTION] Function Macros
  *  [SECTION] Platform Defines
  *  [SECTION] Compiler Defines
+ *  [SECTION] Compiler Warnings
  *  [SECTION] Imports/Exports
  *  [SECTION] Data Structures
  *  [SECTION] C Only Functions
@@ -236,9 +237,9 @@
  * @code
  * TomlKey *toml = tomlLoad("basic.toml");
  * if (toml == NULL) return 1;
- * const char *json = tomlDumps(toml);
- * printf("%s\n", json);
- * free((void *)json);
+ * const char *Toml = tomlDumps(toml);
+ * printf("%s\n", Toml);
+ * free((void *)Toml);
  * tomlFree(toml);
  * @endcode
  * @note This macro uses C11 _Generic to select the appropriate function based on the type of `object`.
@@ -449,6 +450,58 @@
 /** @} */
 
 //-----------------------------------------------------------------------------
+// [SECTION] Warnings
+//-----------------------------------------------------------------------------
+
+/**
+ * @defgroup compiler Compiler Warnings
+ * @{
+ */
+
+#if MYTOML_COMPILER_IS(CLANG)
+#define MYTOML_PRAGMA_TO_STR(x) _Pragma(#x)
+#define MYTOML_CLANG_SUPPRESS_WARNING_PUSH _Pragma("clang diagnostic push")
+#define MYTOML_CLANG_SUPPRESS_WARNING(w) MYTOML_PRAGMA_TO_STR(clang diagnostic ignored w)
+#define MYTOML_CLANG_SUPPRESS_WARNING_POP _Pragma("clang diagnostic pop")
+#define MYTOML_CLANG_SUPPRESS_WARNING_WITH_PUSH(w) \
+    MYTOML_CLANG_SUPPRESS_WARNING_PUSH MYTOML_CLANG_SUPPRESS_WARNING(w)
+#else // MYTOML_CLANG
+#define MYTOML_CLANG_SUPPRESS_WARNING_PUSH
+#define MYTOML_CLANG_SUPPRESS_WARNING(w)
+#define MYTOML_CLANG_SUPPRESS_WARNING_POP
+#define MYTOML_CLANG_SUPPRESS_WARNING_WITH_PUSH(w)
+#endif // MYTOML_CLANG
+
+#if MYTOML_COMPILER_IS(GCC)
+#define MYTOML_PRAGMA_TO_STR(x) _Pragma(#x)
+#define MYTOML_GCC_SUPPRESS_WARNING_PUSH _Pragma("GCC diagnostic push")
+#define MYTOML_GCC_SUPPRESS_WARNING(w) MYTOML_PRAGMA_TO_STR(GCC diagnostic ignored w)
+#define MYTOML_GCC_SUPPRESS_WARNING_POP _Pragma("GCC diagnostic pop")
+#define MYTOML_GCC_SUPPRESS_WARNING_WITH_PUSH(w) \
+    MYTOML_GCC_SUPPRESS_WARNING_PUSH MYTOML_GCC_SUPPRESS_WARNING(w)
+#else // MYTOML_GCC
+#define MYTOML_GCC_SUPPRESS_WARNING_PUSH
+#define MYTOML_GCC_SUPPRESS_WARNING(w)
+#define MYTOML_GCC_SUPPRESS_WARNING_POP
+#define MYTOML_GCC_SUPPRESS_WARNING_WITH_PUSH(w)
+#endif // MYTOML_GCC
+
+#if MYTOML_COMPILER_IS(MSVC)
+#define MYTOML_MSVC_SUPPRESS_WARNING_PUSH __pragma(warning(push))
+#define MYTOML_MSVC_SUPPRESS_WARNING(w) __pragma(warning(disable : w))
+#define MYTOML_MSVC_SUPPRESS_WARNING_POP __pragma(warning(pop))
+#define MYTOML_MSVC_SUPPRESS_WARNING_WITH_PUSH(w) \
+    MYTOML_MSVC_SUPPRESS_WARNING_PUSH MYTOML_MSVC_SUPPRESS_WARNING(w)
+#else // MYTOML_MSVC
+#define MYTOML_MSVC_SUPPRESS_WARNING_PUSH
+#define MYTOML_MSVC_SUPPRESS_WARNING(w)
+#define MYTOML_MSVC_SUPPRESS_WARNING_POP
+#define MYTOML_MSVC_SUPPRESS_WARNING_WITH_PUSH(w)
+#endif // MYTOML_MSVC
+
+/** @} */
+
+//-----------------------------------------------------------------------------
 // [SECTION] Import/Export
 //-----------------------------------------------------------------------------
 
@@ -477,10 +530,10 @@
 
 #if defined(MYTOML_BUILD_STATIC)
 #define MYTOML_API
-#elif defined(MYTOML_BUILD_SHARED)
+#elif defined(MYTOML_BUILD_SHARED) || defined(MYTOML_EXPORTS)
 /* We are building this library */
 #define MYTOML_API MYTOML_API_EXPORT
-#elif defined(MYTOML_IMPORT)
+#elif defined(MYTOML_LOAD_SHARED) || defined(MYTOML_IMPORTS)
 /* We are using this library */
 #define MYTOML_API MYTOML_API_IMPORT
 #else // MYTOML_BUILD_STATIC
@@ -495,7 +548,7 @@
 
 /**
  * @defgroup basic Basic Types
- * @brief Core types and data structures for TOML parsing.
+ * @brief Core types and data structures for TOML.
  * @{
  */
 
@@ -744,10 +797,10 @@ extern "C"
     MYTOML_API void tomlValueDumpBuffer(TomlValue *v, char **buffer, size_t *size);
 
     /**
-     * @brief Dump TOML key as JSON to stdout.
-     * @param[in] root Root TOML key to dump as JSON.
+     * @brief Dump TOML key as Toml to stdout.
+     * @param[in] root Root TOML key to dump as Toml.
      */
-    MYTOML_API void toml_json_dump(TomlKey *root);
+    MYTOML_API void toml_Toml_dump(TomlKey *root);
 
     /**
      * @brief Free memory allocated for a TomlKey object and all its children.
@@ -816,35 +869,84 @@ extern "C"
 //-----------------------------------------------------------------------------
 
 #ifdef __cplusplus
-
-/**
- * @class TomlError
- * @brief TomlError class for Toml-related errors.
- */
-class TomlError : public std::exception
+namespace mytoml
 {
-public:
-    /**
-     * @brief Constructs an exception with a specific error type.
-     * @param type The type of the error.
-     */
-    TomlError(TomlError_t type);
+    // class Toml
+    // {
+    // public:
+    //     Toml(TomlValue value);
+
+    //     TomlValueType Type() const;
+
+    //     bool IsArray() const;
+    //     bool IsObject() const;
+    //     bool IsString() const;
+    //     bool IsNumber() const;
+    //     bool IsBool() const;
+    //     bool IsNone() const;
+
+    //     Toml &operator=(const Toml &other);
+    //     Toml &operator=(Toml &&other) noexcept;
+    //     bool operator==(const Toml &other) const;
+    //     bool operator!=(const Toml &other) const;
+
+    //     Toml &operator[](const std::string &key);
+    //     Toml &operator[](int index);
+
+    //     std::string operator()(const std::string &key) const;
+    //     std::string operator()(int index) const;
+    // };
+
+    // MYTOML_API void dump(Toml* toml, FILE * file);
+    // MYTOML_API void dump(Toml* toml, char * file);
+    // MYTOML_API char *dumps(Toml * toml);
+
+    // MYTOML_API Toml load(FILE * file);
+    // MYTOML_API Toml load(char * file);
+    // MYTOML_API Toml loads(char* toml);
+
+    std::ostream &operator<<(std::ostream &os, const mytoml::Toml &toml);
 
     /**
-     * @brief Gets the error message.
-     * @return The error message.
+     * @class TomlError
+     * @brief TomlError class for Toml-related errors.
      */
-    const char *what() const noexcept override;
+    class TomlError : public std::exception
+    {
+    public:
+        /**
+         * @brief Constructs an exception with a specific error type.
+         * @param type The type of the error.
+         */
+        TomlError(TomlError_t type);
 
-    /**
-     * @brief Gets the error type.
-     * @return The error type.
+        /**
+         * @brief Gets the error message.
+         * @return The error message.
+         */
+        const char *what() const noexcept override;
+
+        /**
+         * @brief Gets the error type.
+         * @return The error type.
+         */
+        TomlErrorType type() const noexcept;
+
+    private:
+        TomlError_t m_Error; /**< The error type. */
+    };
+
+    /** Errors that occur during usage
      */
-    TomlErrorType type() const noexcept;
+    class DecoderError : public TomlError
+    {
+    public:
+        DecoderError(TomlError_t error)
+            : TomlError(error) {};
+        virtual ~DecoderError() {}
+    };
 
-private:
-    TomlError_t m_Error; /**< The error type. */
-};
+} // namespace mytoml
 
 #endif //__cplusplus
 

@@ -5,42 +5,79 @@ project(Mytoml-Examples)
 # Basic Sample Configures   
 #--------------------------------------------------------------------
 
+include(CMakeParseArguments)
+
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(MYTOML_EXAMPLE_LIB_NAME ${MYTOML_LIB_NAME}-e)
 
-option(BUILD_SHARED_LIBS "Build shared libraries" ON)
-add_library(${MYTOML_EXAMPLE_LIB_NAME} ../${MYTOML_SOURCES})
+#--------------------------------------------------------------------
+# Add Sample Function
+#--------------------------------------------------------------------
 
-target_include_directories(${MYTOML_EXAMPLE_LIB_NAME} 
-    PUBLIC 
-        $<BUILD_INTERFACE:${MYTOML_INCLUDE_BUILD_DIR}>
-)
+# add a new target which is a MYTOML example
+# example: 
+#   mytoml_add_example(mytoml-sample basic.cpp ... libmytoml)
+#   mytoml_add_example(mytoml-sample SHARED basic.cpp ... mytoml)
+function(mytoml_add_example target SOURCES DEPENDS)
 
-set_target_properties(${MYTOML_EXAMPLE_LIB_NAME} 
-    PROPERTIES DEFINE_SYMBOL MYTOML_BUILD_SHARED
-    )
+  if(NOT SOURCES)
+    message(FATAL_ERROR "mytoml_add_example needs at least one source")
+  endif()
+
+  if(NOT DEPENDS)
+    message(FATAL_ERROR "mytoml_add_example needs a dependency")
+  endif()
+
+    # set a source group for the source files
+    source_group("" FILES ${SOURCES})
+
+    # create the target
+    add_executable(${target} ${SOURCES})
+
+    # set the debug suffix
+    set_target_properties(${target} PROPERTIES DEBUG_POSTFIX -d)
+
+    # set the target's folder (for IDEs that support it, e.g. Visual Studio)
+    set_target_properties(${target} PROPERTIES FOLDER "Examples")
+
+    # set the target C/C++ standard.
+    set_property(TARGET ${target} PROPERTY C_STANDARD 17)
+    set_property(TARGET ${target} PROPERTY CXX_STANDARD 17)
+
+    # set the Visual Studio startup path for debugging
+    set_target_properties(${target} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+  if(ARGS_SHARED)
+    set_target_properties(${target} PROPERTIES DEFINE_SYMBOL MYTOML_IMPORT)
+  endif()
+
+    # link the target to its dependencies
+    target_link_libraries(${target} PUBLIC ${DEPENDS})
+
+    # Enable support for UTF-8 characters in source code
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /utf-8)
+    endif()
+
+    # Add the test
+  add_test(NAME ${target} COMMAND ${target})
+
+endfunction()
 
 #--------------------------------------------------------------------
 # Sample Functions
 #--------------------------------------------------------------------
 
-function(add_c_sample NAME)
-  add_executable(${NAME} ${NAME}.c)
-  set_property(TARGET ${NAME} PROPERTY C_STANDARD 17)
-  target_link_libraries(${NAME} ${MYTOML_EXAMPLE_LIB_NAME})
-  target_include_directories(${NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
-  set_target_properties(${NAME} PROPERTIES DEFINE_SYMBOL MYTOML_IMPORT)
+function(add_default_sample target sourcefiles)
+  mytoml_add_example(${target} ${sourcefiles} "${MYTOML_LIB_NAME}")
 endfunction()
 
-function(add_cpp_sample NAME)
-  add_executable(${NAME} ${NAME}.cpp)
-  target_include_directories(${NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
-  target_link_libraries(${NAME} ${MYTOML_EXAMPLE_LIB_NAME})
-  set_property(TARGET ${NAME} PROPERTY CXX_STANDARD 17)
-  set_target_properties(${NAME} PROPERTIES DEFINE_SYMBOL MYTOML_IMPORT)
+function(add_debug_sample target sourcefiles)
+  if(MYTOML_BUILD_DEBUG)
+  mytoml_add_example(${target} ${sourcefiles} "${MYTOML_LIB_NAME}-d")
+  endif()
 endfunction()
 
 #--------------------------------------------------------------------
@@ -51,7 +88,6 @@ endfunction()
 file(GLOB C_SAMPLE_SOURCES "*.c")
 foreach(SAMPLE_FILE ${C_SAMPLE_SOURCES})
   get_filename_component(SAMPLE_NAME ${SAMPLE_FILE} NAME_WE)
-  add_c_sample(${SAMPLE_NAME})
 endforeach()
 
 
@@ -59,5 +95,6 @@ endforeach()
 file(GLOB CPP_SAMPLE_SOURCES "*.cpp")
 foreach(SAMPLE_FILE ${CPP_SAMPLE_SOURCES})
   get_filename_component(SAMPLE_NAME ${SAMPLE_FILE} NAME_WE)
-  add_cpp_sample(${SAMPLE_NAME})
 endforeach()
+
+add_default_sample(basic-sample basic.c)

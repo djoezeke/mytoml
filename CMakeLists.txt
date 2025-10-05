@@ -9,7 +9,7 @@ set (MYTOML_VERSION_MINOR 1)
 set (MYTOML_VERSION_PATCH 1)
 set (MYTOML_VERSION_STRING ${MYTOML_VERSION_MAJOR}.${MYTOML_VERSION_MINOR}.${MYTOML_VERSION_PATCH})
 
-project(mytoml
+project(Mytoml
         VERSION ${MYTOML_VERSION_STRING} 
         DESCRIPTION "Toml parser for C/C++"
         HOMEPAGE_URL "https://github.com/djoezeke/mytoml"
@@ -27,16 +27,24 @@ else()
   set(MYTOML_IS_TOP_LEVEL OFF)
 endif()
 
+# Add UTF-8 encoding support for MSVC compiler.
+# This ensures that the MSVC compiler interprets source files as UTF-8 encoded,
+# which is useful for projects containing non-ASCII characters in source files.
+add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
+add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+
 #--------------------------------------------------------------------
 # Configure variables for the library   
 #--------------------------------------------------------------------
+
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
 set(MYTOML_LIB_NAME "mytoml" CACHE STRING "Base name of library output name")
 
-set(MYTOML_SOURCES mytoml.c)
-set(MYTOML_INCLUDES mytoml.h)
-set(MYTOML_TARGET_NAME  ${MYTOML_LIB_NAME})
+set(MYTOML_SOURCE mytoml.c)
+set(MYTOML_HEADER mytoml.h)
+set(MYTOML_TARGET_NAME  "${MYTOML_LIB_NAME}")
 
 # Set required C/C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -44,10 +52,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED TRUE)
 
-option(MYTOML_BUILD_SHARED "Build shared library" OFF)
 option(MYTOML_BUILD_EXAMPLES "Build the ${PROJECT_NAME} example applications" ${MYTOML_IS_TOP_LEVEL})
+option(MYTOML_BUILD_SHARED "Build shared library" ${MYTOML_IS_TOP_LEVEL})
+option(MYTOML_BUILD_DEBUG "Build debug version of library" ${MYTOML_IS_TOP_LEVEL})
 option(MYTOML_BUILD_TESTS "Build the ${PROJECT_NAME} test programs" ${MYTOML_IS_TOP_LEVEL})
-option(MYTOML_INSTALL "Generate installation target" ${MYTOML_IS_TOP_LEVEL})
+option(MYTOML_INSTALL_DOCS "Enable installation of documentation." ${MYTOML_IS_TOP_LEVEL})
+
+option(MYTOML_ENABLE_INSTALL "Enable installation." ${MYTOML_IS_TOP_LEVEL})
+option(MYTOML_ENABLE_DOXYGEN "Build documentation with Doxygen." ${MYTOML_IS_TOP_LEVEL})
+option(MYTOML_ENABLE_WARNING "Enable warning messages." ${MYTOML_IS_TOP_LEVEL})
+option(MYTOML_ENABLE_PACKING "Enable packing with CPack." ${MYTOML_IS_TOP_LEVEL})
+
 
 set(MYTOML_CMAKE_CONFIG_NAME "${PROJECT_NAME}Config")
 set(MYTOML_CMAKE_TARGET_NAME "${PROJECT_NAME}Target")
@@ -71,17 +86,90 @@ set(MYTOML_CMAKE_VERSION_CONFIG_FILE  ${MYTOML_CMAKE_CONFIG_DIR}/${PROJECT_NAME}
 # Build library targets
 #--------------------------------------------------------------------
 
-if(MYTOML_BUILD_SHARED)
-    option(BUILD_SHARED_LIBS "Build shared libraries" ON)
-endif()
+# If both shared and static libs are build at once with MSVC it generates a
+# shared library consisting of
+#
+# * a DLL (that contains the actual code) with filename suffix `.dll`,
+# * a correspoding import library (against which users should link) with
+#   filename suffix `.lib`.
+#
+# and a static library with filename suffix `.lib`
+#
+# As both, the shared import library and the static library share the same
+# basename and suffix one would overwrite the other.
+#
+# To solve this issue we set the PREFIX for *static* libs explicitely so MSVC
+# will build:
+#
+# * shared: mytoml.dll
+# * import: mytoml.lib
+# * static: libmytoml.lib
+#
+# and this for debug:
+#
+# * shared: mytoml-d.dll
+# * import: mytoml-d.lib
+# * static: libmytoml-d.lib
+#
+# As all other platforms already set `PREFIX` for all lib types they remain
+# unchanged. Therefore no `if(MSVC)` check is needed here.
 
-add_library(${MYTOML_LIB_NAME} ${MYTOML_SOURCES})
+# static library
+option(BUILD_SHARED_LIBS OFF)
+add_library("${MYTOML_LIB_NAME}" ${MYTOML_SOURCE})
 
-target_include_directories(${MYTOML_LIB_NAME} 
+target_include_directories("${MYTOML_LIB_NAME}" 
     PUBLIC 
         $<BUILD_INTERFACE:${MYTOML_INCLUDE_BUILD_DIR}>
         $<INSTALL_INTERFACE:${MYTOML_INCLUDE_INSTALL_DIR}>
 )
+set_target_properties("${MYTOML_LIB_NAME}" PROPERTIES DEFINE_SYMBOL MYTOML_BUILD_STATIC)
+set_target_properties("${MYTOML_LIB_NAME}" PROPERTIES VERSION ${PROJECT_VERSION})
+
+# shared library
+if(MYTOML_BUILD_SHARED)
+
+    add_library("${MYTOML_LIB_NAME}s" SHARED ${MYTOML_SOURCE})
+
+    target_include_directories("${MYTOML_LIB_NAME}" 
+        PUBLIC 
+            $<BUILD_INTERFACE:${MYTOML_INCLUDE_BUILD_DIR}>
+            $<INSTALL_INTERFACE:${MYTOML_INCLUDE_INSTALL_DIR}>
+    )
+    set_target_properties("${MYTOML_LIB_NAME}s" PROPERTIES DEFINE_SYMBOL MYTOML_BUILD_SHARED )
+    set_target_properties("${MYTOML_LIB_NAME}s" PROPERTIES VERSION ${PROJECT_VERSION})
+
+endif()
+
+if (MYTOML_BUILD_DEBUG)
+
+    if(NOT CMAKE_BUILD_TYPE)
+        set(CMAKE_BUILD_TYPE Debug)
+    endif()
+
+    # static library
+    add_library("${MYTOML_LIB_NAME}-d" ${MYTOML_SOURCE})
+
+    target_include_directories("${MYTOML_LIB_NAME}-d" 
+        PUBLIC 
+            $<BUILD_INTERFACE:${MYTOML_INCLUDE_BUILD_DIR}>
+    )
+    set_target_properties("${MYTOML_LIB_NAME}-d" PROPERTIES DEFINE_SYMBOL MYTOML_BUILD_STATIC)
+    set_target_properties("${MYTOML_LIB_NAME}-d" PROPERTIES VERSION ${PROJECT_VERSION})
+
+    # shared library
+    if(MYTOML_BUILD_SHARED)
+
+        add_library("${MYTOML_LIB_NAME}s-d" SHARED ${MYTOML_SOURCE})
+
+        target_include_directories("${MYTOML_LIB_NAME}s-d" 
+            PUBLIC 
+                $<BUILD_INTERFACE:${MYTOML_INCLUDE_BUILD_DIR}>
+        )
+        set_target_properties("${MYTOML_LIB_NAME}s-d" PROPERTIES DEFINE_SYMBOL MYTOML_BUILD_SHARED )
+        set_target_properties("${MYTOML_LIB_NAME}s-d" PROPERTIES VERSION ${PROJECT_VERSION})
+    endif()
+endif()
 
 #--------------------------------------------------------------------
 # Configurations
@@ -96,16 +184,6 @@ if(NOT CMAKE_BUILD_TYPE)
 		message(STATUS "No build type selected but tests are being built, default to Debug")
 		set(CMAKE_BUILD_TYPE "Debug")
 	endif()
-endif()
-
-if(BUILD_SHARED_LIBS)
-    set_target_properties(${MYTOML_LIB_NAME} 
-    PROPERTIES DEFINE_SYMBOL MYTOML_BUILD_SHARED
-    )
-else()
-    set_target_properties(${MYTOML_LIB_NAME} 
-    PROPERTIES DEFINE_SYMBOL MYTOML_BUILD_STATIC
-    )
 endif()
 
 # Output directories for a build tree
@@ -144,7 +222,6 @@ endif()
 #--------------------------------------------------------------------
 # Configure package.
 #--------------------------------------------------------------------
-include(CMakePackageConfigHelpers)
 
 configure_file(
     ${MYTOML_CMAKE_CONFIG_TEMPLATE}
@@ -166,8 +243,8 @@ configure_file(
 #--------------------------------------------------------------------
 # Install package.
 #--------------------------------------------------------------------
-if(MYTOML_INSTALL)
-    # Generate 'mytomlConfig.cmake', 'mytomlConfigVersion.cmake' and 'mytomlTargets.cmake'
+
+if(MYTOML_ENABLE_INSTALL)
 
     install(
         DIRECTORY ${MYTOML_INCLUDE_BUILD_DIR}

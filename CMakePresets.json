@@ -10,50 +10,28 @@
       "name": "default",
       "hidden": false,
       "generator": "Ninja",
-      "description": "Default build with shared library, examples, and tests enabled",
+      "description": "Default build with static library, examples, and tests enabled",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
+        "MYTOML_BUILD_TESTS": "ON",
+        "MYTOML_BUILD_DEBUG": "OFF",
         "MYTOML_BUILD_SHARED": "ON",
-        "MYTOML_BUILD_EXAMPLES": "ON",
-        "MYTOML_BUILD_TESTS": "ON"
+        "MYTOML_BUILD_EXAMPLES": "ON"
       }
     },
     {
-      "name": "static",
+      "name": "debug",
       "hidden": false,
       "generator": "Ninja",
-      "description": "Build static library with examples and tests enabled",
+      "description": "Debug build for development with examples and tests enabled",
       "binaryDir": "${sourceDir}/build/static",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "MYTOML_BUILD_SHARED": "OFF",
-        "MYTOML_BUILD_EXAMPLES": "ON",
-        "MYTOML_BUILD_TESTS": "ON"
-      }
-    },
-    {
-      "name": "dev-debug",
-      "description": "Debug build for development with shared library",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/debug",
-      "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
+        "MYTOML_BUILD_TESTS": "ON",
+        "MYTOML_BUILD_DEBUG": "ON",
         "MYTOML_BUILD_SHARED": "ON",
-        "MYTOML_BUILD_EXAMPLES": "ON",
-        "MYTOML_BUILD_TESTS": "ON"
-      }
-    },
-    {
-      "name": "dev-debug-static",
-      "description": "Debug build for development with static library",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/debug/static",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "MYTOML_BUILD_SHARED": "OFF",
-        "MYTOML_BUILD_EXAMPLES": "ON",
-        "MYTOML_BUILD_TESTS": "ON"
+        "MYTOML_BUILD_EXAMPLES": "ON"
       }
     }
   ],
@@ -67,7 +45,7 @@
     },
     {
       "name": "debug-tests",
-      "configurePreset": "dev-debug",
+      "configurePreset": "debug",
       "output": {
         "outputOnFailure": true
       }
