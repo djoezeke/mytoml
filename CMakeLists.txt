@@ -27,6 +27,12 @@ else()
   set(MYTOML_IS_TOP_LEVEL OFF)
 endif()
 
+# Set required C/C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+set(CMAKE_C_STANDARD 17)
+set(CMAKE_C_STANDARD_REQUIRED TRUE)
+
 # Add UTF-8 encoding support for MSVC compiler.
 # This ensures that the MSVC compiler interprets source files as UTF-8 encoded,
 # which is useful for projects containing non-ASCII characters in source files.
@@ -45,12 +51,6 @@ set(MYTOML_LIB_NAME "mytoml" CACHE STRING "Base name of library output name")
 set(MYTOML_SOURCE mytoml.c)
 set(MYTOML_HEADER mytoml.h)
 set(MYTOML_TARGET_NAME  "${MYTOML_LIB_NAME}")
-
-# Set required C/C++ standard
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
-set(CMAKE_C_STANDARD 17)
-set(CMAKE_C_STANDARD_REQUIRED TRUE)
 
 option(MYTOML_BUILD_EXAMPLES "Build the ${PROJECT_NAME} example applications" ${MYTOML_IS_TOP_LEVEL})
 option(MYTOML_BUILD_SHARED "Build shared library" ${MYTOML_IS_TOP_LEVEL})
@@ -198,6 +198,11 @@ endif()
 # Build the example apps   
 if(MYTOML_BUILD_EXAMPLES)
     add_subdirectory(samples)
+endif()
+
+# Build the documentation   
+if(MYTOML_ENABLE_DOXYGEN)
+    add_subdirectory(docs)
 endif()
 
 # Build the test apps   
