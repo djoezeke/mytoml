@@ -197,7 +197,7 @@ endif()
 
 # Build the example apps   
 if(MYTOML_BUILD_EXAMPLES)
-    add_subdirectory(samples)
+    add_subdirectory(examples)
 endif()
 
 # Build the documentation   
