@@ -1,0 +1,22 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Mytoml | TOML for Modern C/C++ 📚
+    url: https://github.com/djoezeke/mytoml
+    about: Simple and Fast Tom's Obvious Markup Language (TOML) Parser for Modern C/C++.
+
+  - name: Mytoml Discussions 💖
+    url: https://github.com/djoezeke/mytoml/discussions
+    about: The "Discussions" forum is where you want to start.
+
+  - name: Mytoml Issues | Bug Bounty 🐞
+    url: https://github.com/djoezeke/mytoml/issues
+    about: Please report issues and vulnerabilities here.
+
+  - name: Mytoml Releases & Tags 📦
+    url: https://github.com/djoezeke/mytoml/releases
+    about: Please latest Mytoml release here.
+
+  - name: Mytoml Documentation 📚
+    url: https://djoezeke.github.io/mytoml/
+    about: Please refer to the Mytoml documentation here.
