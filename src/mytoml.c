@@ -291,6 +291,7 @@ extern "C" {
 
 // Helper function to append formatted text to a string buffer
 void _mytoml_append_to_buffer(char **buffer, size_t *size, const char *format, ...);
+void myString_AppendToBuffer(char **buffer, size_t *size, const char *format, ...);
 
 static inline void _mytoml_string_dump(const char *s, char **buffer, size_t *size);
 
