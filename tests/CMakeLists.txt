@@ -1,30 +1,67 @@
-cmake_minimum_required(VERSION 3.16...4.1.1 FATAL_ERROR)
-project(Mytoml-Tests)
+# ===================================================================
+# Copyright © 2025 Sackey Ezekiel Etrue
+# Distributed under the terms of the MIT license.
+# ===================================================================
+
+# TODO: Use FetchContent if Catch2 submodule is not found
+# TODO: Set the target flags to use the appropriate C++ standard library
+# TODO: Enable Code Coverage
 
 #--------------------------------------------------------------------
 # Basic Test Configures   
 #--------------------------------------------------------------------
 
-include(CMakeParseArguments)
+# Check that all required submodules are there
+set(
+  GIT_TEST_SUBMODULES
+  Catch2
+)
+
+foreach (submodule IN ITEMS ${GIT_TEST_SUBMODULES})
+  if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/${submodule}/.git")
+  message( FATAL_ERROR "Required CMake submodule `${submodule}' not found. This \
+  is most likely caused by an incomplete clone from the main repository. Please run:
+  $ git submodule update --init --recursive
+to clone all required submodules and run CMake again.")
+  endif()
+endforeach()
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Debug)
 endif()
 
-if(WIN32)
-  add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
-endif()
-
 include_directories("." "../")
 
+# Add Catch2 as a subdirectory
+add_subdirectory(vendor/Catch2)
+
+# Build Catch2 in C++17 mode to enable C++17 features
+target_compile_features(Catch2 PRIVATE cxx_std_17)
+
+# Ensure that Catch2 sources and headers are not analyzed by any tools
+set_target_properties(Catch2 PROPERTIES COMPILE_OPTIONS "" EXPORT_COMPILE_COMMANDS OFF UNITY_BUILD ON UNITY_BUILD_BATCH_SIZE 256)
+set_target_properties(Catch2WithMain PROPERTIES EXPORT_COMPILE_COMMANDS OFF)
+set_target_properties(Catch2 Catch2WithMain PROPERTIES FOLDER "Dependencies")
+get_target_property(CATCH2_INCLUDE_DIRS Catch2 INTERFACE_INCLUDE_DIRECTORIES)
+target_include_directories(Catch2 SYSTEM INTERFACE ${CATCH2_INCLUDE_DIRS})
+
+# Add the Catch2 CMake module path so CTest integration works
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/vendor/Catch2/Cmake")
+
+# Include Catch2 helper functions
+include(Catch)
+
+set(MYTOML_TEST_SRC
+    src/main.test.cpp
+)
+
+
 #--------------------------------------------------------------------
-# Add Test Function
+# Test Functions
 #--------------------------------------------------------------------
 
 # add a new target which is a MYTOML test
-# example: 
-#   mytoml_add_test(mytoml-test basic.cpp ... libmytoml)
-#   mytoml_add_test(mytoml-test SHARED basic.cpp ... mytoml)
+# example: mytoml_add_test(main-tests main.test.cpp "")
 function(mytoml_add_test target SOURCES DEPENDS)
 
     # set a source group for the source files
@@ -33,15 +70,8 @@ function(mytoml_add_test target SOURCES DEPENDS)
     # create the target
     add_executable(${target} ${SOURCES})
 
-    # set the debug suffix
-    set_target_properties(${target} PROPERTIES DEBUG_POSTFIX -d)
-
     # set the target's folder (for IDEs that support it, e.g. Visual Studio)
     set_target_properties(${target} PROPERTIES FOLDER "Tests")
-
-    # set the target C/C++ standard.
-    set_property(TARGET ${target} PROPERTY C_STANDARD 17)
-    set_property(TARGET ${target} PROPERTY CXX_STANDARD 17)
 
     set_target_properties(${target} PROPERTIES
         VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} # set the Visual Studio startup path for debugging
@@ -51,12 +81,16 @@ function(mytoml_add_test target SOURCES DEPENDS)
         XCODE_SCHEME_ARGUMENTS "-b" # Break into debugger
     )
 
-    if(ARGS_SHARED)
-      set_target_properties(${target} PROPERTIES DEFINE_SYMBOL MYTOML_IMPORT)
-    endif()
+    # link the target to its MYTOML dependencies
+    target_link_libraries(${target} PRIVATE ${DEPENDS} Mytoml::Mytoml Catch2::Catch2WithMain)
 
-    # link the target to its dependencies
-    target_link_libraries(${target} PRIVATE ${DEPENDS})
+    # If coverage is enabled for MSVC and we are linking statically, use /WHOLEARCHIVE
+    # to make sure the linker doesn't discard unused code sections before coverage can be measured
+    if(MYTOML_ENABLE_COVERAGE AND MSVC AND NOT BUILD_SHARED_LIBS)
+        foreach(DEPENDENCY ${DEPENDS})
+            target_link_options(${target} PRIVATE $<$<CONFIG:DEBUG>:/WHOLEARCHIVE:$<TARGET_LINKER_FILE:${DEPENDENCY}>>)
+        endforeach()
+    endif()
 
     # Enable support for UTF-8 characters in source code
     if(MSVC)
@@ -64,38 +98,13 @@ function(mytoml_add_test target SOURCES DEPENDS)
     endif()
 
     # Add the test
-  add_test(NAME ${target} COMMAND ${target})
-
+    catch_discover_tests(${target} WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR})
 endfunction()
 
 #--------------------------------------------------------------------
-# Test Functions
+# Manually or Recursively add Tests
 #--------------------------------------------------------------------
 
-function(add_test_default target sourcefiles)
-  mytoml_add_test(${target} ${sourcefiles} "${MYTOML_LIB_NAME}")
-endfunction()
+mytoml_add_test(mytoml-tests "${MYTOML_TEST_SRC}" "")
 
-function(add_test_debug target sourcefiles)
-  if(MYTOML_BUILD_DEBUG)
-  mytoml_add_test(${target} ${sourcefiles} "${MYTOML_LIB_NAME}-d")
-  endif()
-endfunction()
-
-
-#--------------------------------------------------------------------
-# Recursively add Tests
-#--------------------------------------------------------------------
-
-# Automatically add all .c tests in this folder
-file(GLOB C_TEST_SOURCES "*.c")
-foreach(TEST_FILE ${C_TEST_SOURCES})
-  get_filename_component(TEST_NAME ${TEST_FILE} NAME_WE)
-endforeach()
-
-# Automatically add all .cpp tests in this folder
-file(GLOB CPP_TEST_SOURCES "*.cpp")
-foreach(TEST_FILE ${CPP_TEST_SOURCES})
-  get_filename_component(TEST_NAME ${TEST_FILE} NAME_WE)
-endforeach()
-
+# TODO: Add Convenience for building and running tests in a single command

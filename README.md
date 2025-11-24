@@ -55,6 +55,7 @@ should be easy to parse into data structures in a wide variety of languages.
 
 More information about TOML can be obtained at [here](https://toml.io/en/)
 
+<!--
 #### Toml Example.
 
 ```toml
@@ -86,7 +87,7 @@ born = 2_013
 name = "Extensible Markup Language"
 type = "good"
 born = 1_996
-```
+``` -->
 
 <!-- ## Design Goals
 

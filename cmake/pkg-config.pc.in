@@ -4,4 +4,5 @@ includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
 Name: @PROJECT_NAME@
 Description: A C/C++ library for Toml
 Version: @PROJECT_VERSION@
+URL: https://github.com/dkoezeke/mytoml
 Cflags: -I${includedir}
