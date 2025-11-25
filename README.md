@@ -43,9 +43,51 @@
 
 **Mytoml** is a modern, lightweight TOML parsing and serialization library for C++. It provides an easy-to-use interface for working with TOML data, including parsing TOML strings, creating TOML objects, and serializing TOML objects to strings.It provides a simple, type-safe API for working with TOML data in C++ projects.
 
-<!-- ## About toml -->
+<img align="right" src=".github/readme/TOML_logo.svg" width="200" alt="TOML Logo">
 
-TOML(Tom's Obvious Markup Language) is a light-weight data exchange format. More information about TOML can be obtained at [here]()
+### [Toml](https://toml.io/en/) [Tom's Obvious Minimal Language]
+
+#### A config file format for humans.
+
+TOML aims to be a minimal configuration file format that's easy to read due to
+obvious semantics. TOML is designed to map unambiguously to a hash table. TOML
+should be easy to parse into data structures in a wide variety of languages.
+
+More information about TOML can be obtained at [here](https://toml.io/en/)
+
+<!--
+#### Toml Example.
+
+```toml
+name = "Mytoml : Toml for Modern C/C++"
+branches = [ "main", "dev" ]
+author = "djoezeke"
+published = true
+
+[[tutorial]]
+[tutorial.yaml]
+name = "YAML Ain't Markup Language"
+type = "awesome"
+born = 2_001
+
+[[tutorial]]
+[tutorial.json]
+name = "JavaScript Object Notation"
+type = "great"
+born = 2_001
+
+[[tutorial]]
+[tutorial.toml]
+name = "Tom's Obvious Minimal Language"
+type = "great"
+born = 2_013
+
+[[tutorial]]
+[tutorial.xml]
+name = "Extensible Markup Language"
+type = "good"
+born = 1_996
+``` -->
 
 <!-- ## Design Goals
 
