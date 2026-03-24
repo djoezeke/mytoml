@@ -12,15 +12,23 @@
 # Test Functions
 #--------------------------------------------------------------------
 
-# add a new target which is a MYXML example
-# example: mytoml_add_example(main-examples main.example.cpp "")
-function(mytoml_add_example target SOURCES DEPENDS)
+# add a new target which is an example
+# example: mytoml_add_example(main-examples
+#                     SOURCES example.cpp
+#                     DEPENDS Mytoml::MytomlC)
+function(mytoml_add_example target)
+
+    # parse the arguments
+    cmake_parse_arguments(THIS "CMYTOML" "" "SOURCES;DEPENDS" ${ARGN})
+    if(NOT "${THIS_UNPARSED_ARGUMENTS}" STREQUAL "")
+        message(FATAL_ERROR "Extra unparsed arguments when calling mytoml_add_example: ${THIS_UNPARSED_ARGUMENTS}")
+    endif()
 
     # set a source group for the source files
-    source_group("" FILES ${SOURCES})
+    source_group("" FILES ${THIS_SOURCES})
 
     # create the target
-    add_executable(${target} ${SOURCES})
+    add_executable(${target} ${THIS_SOURCES})
 
     # set the target's folder (for IDEs that support it, e.g. Visual Studio)
     set_target_properties(${target} PROPERTIES FOLDER "Examples")
@@ -28,8 +36,13 @@ function(mytoml_add_example target SOURCES DEPENDS)
     # set the Visual Studio startup path for debugging
     set_target_properties(${target} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-    # link the target to its MYXML dependencies
-    target_link_libraries(${target} PRIVATE ${DEPENDS} Mytoml::Mytoml)
+    if(THIS_CMYTOML)
+        # link the target to its dependencies
+        target_link_libraries(${target} PRIVATE ${THIS_DEPENDS} Mytoml::Mytoml)
+    else()
+        # link the target to its dependencies
+        target_link_libraries(${target} PRIVATE ${THIS_DEPENDS} Mytoml::MytomlC)
+    endif()
 
     # Enable support for UTF-8 characters in source code
     if(MSVC)
@@ -46,3 +59,4 @@ add_subdirectory(apis)
 # Build Usage Tutorial Projects
 #--------------------------------------------------------------------
 add_subdirectory(tutorials)
+

@@ -1,4 +1,9 @@
-# Documentation
+# [MYTOML](https://djoezeke.github.io/mytoml) [ DOCUMENTATION ]
+
+This folder contains code for documentations.
+
+> [!NOTE]
+> Mytoml is still in development.
 
 Note on documentation: The source files contain links to the online documentation at https://djoezeke.github.io/mytoml.
 
@@ -35,3 +40,9 @@ Generating documentation with doxygen:
 git clone https://github.com/djoezeke/mytoml.git
 cd mytoml
 ```
+
+Some documentation missing? As always, contributions are welcome, feel free to send new documentation!
+
+## License
+
+Mytoml is licensed under the MIT License, see [LICENSE](../LICENSE) for more information.

@@ -10,10 +10,13 @@
       "name": "default",
       "hidden": false,
       "generator": "Ninja",
+      "binaryDir": "build",
+      "installDir": "${sourceDir}/build/install",
       "description": "Default build with static library, examples, and tests enabled",
-      "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_EXTENSIONS": "OFF",
+        "CMAKE_CXX_EXTENSIONS": "OFF",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "MYTOML_BUILD_TESTS": "ON",
         "MYTOML_BUILD_DEBUG": "OFF",
         "MYTOML_BUILD_SHARED": "ON",
@@ -21,13 +24,16 @@
       }
     },
     {
-      "name": "debug",
+      "name": "develop",
       "hidden": false,
       "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/develop",
+      "installDir": "${sourceDir}/build/install",
       "description": "Debug build for development with examples and tests enabled",
-      "binaryDir": "${sourceDir}/build/debug",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_EXTENSIONS": "OFF",
+        "CMAKE_CXX_EXTENSIONS": "OFF",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "MYTOML_BUILD_TESTS": "ON",
         "MYTOML_BUILD_DEBUG": "ON",
         "MYTOML_BUILD_SHARED": "ON",
@@ -37,15 +43,15 @@
   ],
   "testPresets": [
     {
-      "name": "default-tests",
+      "name": "default",
       "configurePreset": "default",
       "output": {
         "outputOnFailure": true
       }
     },
     {
-      "name": "debug-tests",
-      "configurePreset": "debug",
+      "name": "develop",
+      "configurePreset": "develop",
       "output": {
         "outputOnFailure": true
       }
