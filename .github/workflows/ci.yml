@@ -33,33 +33,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang-format clang-tidy
 
-      - name: Check formatting
-        run: |
-          mapfile -t files < <(git ls-files '*.c' '*.h' '*.cpp' '*.hpp' '*.cc' '*.hh' '*.cxx' '*.hxx')
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "No source files found for format check"
-            exit 0
-          fi
+      - name: Configure for clang checks
+        run: cmake --preset default -B build-tidy -DMYTOML_BUILD_TESTS=OFF -DMYTOML_BUILD_EXAMPLES=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
-          failed=0
-          for f in "${files[@]}"; do
-            if ! diff -u "$f" <(clang-format -style=file "$f") >/dev/null; then
-              echo "Formatting mismatch: $f"
-              failed=1
-            fi
-          done
+      - name: Run format target
+        run: cmake --build build-tidy --target format
 
-          if [ $failed -ne 0 ]; then
-            echo "clang-format check failed"
-            exit 1
-          fi
-
-      - name: Configure for clang-tidy
-        run: cmake --preset default -B build-tidy -DMYTOML_BUILD_TESTS=OFF -DMYTOML_BUILD_EXAMPLES=OFF
-
-      - name: Run clang-tidy
-        run: |
-          clang-tidy src/mytoml.cpp src/mytomlc.cpp -p build-tidy -- -Iinclude
+      - name: Run tidy target
+        run: cmake --build build-tidy --target tidy
 
   cmake:
     name: CMake (${{ matrix.os }})
@@ -119,7 +100,7 @@ jobs:
           python -m pip install meson ninja
 
       - name: Configure
-        run: meson setup build-meson-${{ matrix.default_library }} -Dmytoml_build_tests=true -Dmytoml_build_examples=true -Dmytoml_default_library=${{ matrix.default_library }}
+        run: meson setup build-meson-${{ matrix.default_library }} -Dmytoml_build_tests=true -Dmytoml_build_examples=true -Ddefault_library=${{ matrix.default_library }}
 
       - name: Build
         run: meson compile -C build-meson-${{ matrix.default_library }}

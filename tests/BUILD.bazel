@@ -3,6 +3,8 @@
 # Distributed under the terms of the MIT license.
 # ===================================================================
 
+load("@rules_cc//cc:defs.bzl", "cc_test")
+
 #===========================
 # C++ Library Tests        #
 #===========================

@@ -13,7 +13,7 @@ project('mytoml',
 	license : 'MIT',
 	default_options : [
 		'buildtype=release',
-		'default_library=' + get_option('mytoml_default_library'),
+		'default_library=static',
 		'cpp_std=' + get_option('mytoml_cpp_std')
 		]
 )
