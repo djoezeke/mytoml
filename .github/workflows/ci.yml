@@ -16,12 +16,12 @@ permissions:
 
 jobs:
   clang:
-    name: Clang Lint (ubuntu)
+    name: Formatting & Linting
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup CMake
         uses: jwlawson/actions-setup-cmake@v2
@@ -53,7 +53,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup CMake
         uses: jwlawson/actions-setup-cmake@v2
@@ -71,7 +71,7 @@ jobs:
 
       - name: Upload CTest logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ctest-logs-${{ matrix.os }}-${{ matrix.preset }}
           path: |
@@ -87,10 +87,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -114,13 +114,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Bazel
         uses: bazelbuild/setup-bazelisk@v3
 
       - name: Cache Bazel outputs
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/bazel

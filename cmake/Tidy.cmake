@@ -1,5 +1,5 @@
 # ===================================================================
-# clang-tidy script for Mytoml
+# clang-tidy script
 # ===================================================================
 
 if(NOT DEFINED PROJECT_SOURCE_DIR OR PROJECT_SOURCE_DIR STREQUAL "")
@@ -25,7 +25,7 @@ if(NOT EXISTS "${PROJECT_BINARY_DIR}/compile_commands.json")
     message(FATAL_ERROR "compile_commands.json not found in ${PROJECT_BINARY_DIR}. Configure with -DCMAKE_EXPORT_COMPILE_COMMANDS=ON.")
 endif()
 
-file(GLOB_RECURSE MYTOML_TIDY_FILES
+file(GLOB_RECURSE TIDY_FILES
     LIST_DIRECTORIES false
     "${PROJECT_SOURCE_DIR}/src/*.c"
     "${PROJECT_SOURCE_DIR}/src/*.cpp"
@@ -33,7 +33,7 @@ file(GLOB_RECURSE MYTOML_TIDY_FILES
     "${PROJECT_SOURCE_DIR}/src/*.cxx"
 )
 
-if(MYTOML_TIDY_FILES STREQUAL "")
+if(TIDY_FILES STREQUAL "")
     message(STATUS "No source files found for clang-tidy")
     return()
 endif()
@@ -41,7 +41,7 @@ endif()
 string(REPLACE "\\" "/" _include_dir_regex "${PROJECT_SOURCE_DIR}/include/.*")
 set(_tidy_failed OFF)
 
-foreach(_file IN LISTS MYTOML_TIDY_FILES)
+foreach(_file IN LISTS TIDY_FILES)
     execute_process(
         COMMAND "${CLANG_TIDY_BIN}" "${_file}" -p "${PROJECT_BINARY_DIR}" "--header-filter=^${_include_dir_regex}" -quiet
         RESULT_VARIABLE _tidy_result

@@ -89,6 +89,9 @@ set(LINK_STATICALLY_DEFAULT ON)
 mytoml_set_option(CMYTOML_LINK_MYTOML_STATICALLY ${LINK_STATICALLY_DEFAULT} BOOL "ON to link to a static version of MYTOML, OFF to link dynamically")
 
 mytoml_set_option(MYTOML_INSTALL ${MYTOML_IS_TOP_LEVEL} BOOL "ON to Generate installation target" )
+mytoml_set_option(MYTOML_ENABLE_INSTALL ${MYTOML_INSTALL} BOOL "Enable installation.")
+mytoml_set_option(MYTOML_ENABLE_PACKING ${MYTOML_INSTALL} BOOL "Enable packing with CPack.")
+
 cmake_dependent_option(MYTOML_INSTALL_DOCS "Install docs for Mytoml" ${MYTOML_IS_TOP_LEVEL} "MYTOML_INSTALL" ON)
 cmake_dependent_option(MYTOML_INSTALL_TESTS "Install test-cases" ${MYTOML_IS_TOP_LEVEL} "MYTOML_INSTALL" ON)
 cmake_dependent_option(MYTOML_INSTALL_CPACK "Create binary Mytoml archive using CPack" ${MYTOML_IS_TOP_LEVEL} "MYTOML_INSTALL" ON)
@@ -179,7 +182,7 @@ set(MYTOML_CMAKE_TARGET_NAME "${PROJECT_NAME}Targets")
 
 set(MYTOML_INCLUDE_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 set(MYTOML_INCLUDE_INSTALL_DIR "${CMAKE_INSTALL_INCLUDEDIR}")
-set(MYTOML_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_DATADIR}/cmake/${PROJECT_NAME}" CACHE INTERNAL "Install directory path for config files.")
+set(MYTOML_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
 
 set(MYTOML_CMAKE_CONFIG_TEMPLATE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(MYTOML_CMAKE_CONFIG_TEMPLATE "${MYTOML_CMAKE_CONFIG_TEMPLATE_DIR}/${MYTOML_CMAKE_CONFIG_NAME}.cmake.in")
@@ -402,12 +405,9 @@ if(MYTOML_BUILD_TESTS)
 endif()
 
 #--------------------------------------------------------------------
-# Install a pkg-config file
-#--------------------------------------------------------------------
-
-#--------------------------------------------------------------------
 # Configure package.
 #--------------------------------------------------------------------
+
 include(CMakePackageConfigHelpers)
 
 configure_file(
@@ -425,22 +425,14 @@ configure_file(
 configure_file(
     "${MYTOML_CMAKE_PACKAGE_CONFIG_TEMPLATE}"
     "${MYTOML_CMAKE_PACKAGE_FILE}"
+    @ONLY
 )
 
 #--------------------------------------------------------------------
 # Install package.
 #--------------------------------------------------------------------
 
-if(MYTOML_INSTALL)
-    install(
-        DIRECTORY ${MYTOML_INCLUDE_BUILD_DIR}/mytoml
-        DESTINATION ${MYTOML_INCLUDE_INSTALL_DIR}
-    )
-
-    install(
-        FILES ${MYTOML_CMAKE_CONFIG_FILE} ${MYTOML_CMAKE_VERSION_CONFIG_FILE}
-        DESTINATION ${MYTOML_CONFIG_INSTALL_DIR}
-    )
+if(MYTOML_ENABLE_INSTALL)
 
     install(
         TARGETS ${MYTOML_EXPORT_TARGETS}
@@ -452,39 +444,28 @@ if(MYTOML_INSTALL)
     )
 
     install(
+        DIRECTORY ${MYTOML_INCLUDE_BUILD_DIR}
+        DESTINATION ${MYTOML_INCLUDE_INSTALL_DIR}
+    )
+
+    install(
         EXPORT ${MYTOML_CMAKE_TARGET_NAME}
         NAMESPACE ${PROJECT_NAME}::
         FILE ${MYTOML_CMAKE_TARGET_NAME}.cmake
         DESTINATION ${MYTOML_CONFIG_INSTALL_DIR}
     )
 
-    install(
-        FILES "${MYTOML_CMAKE_PACKAGE_FILE}"
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
+    install(FILES 
+        ${MYTOML_CMAKE_CONFIG_FILE} 
+        ${MYTOML_CMAKE_VERSION_CONFIG_FILE}
+        DESTINATION ${MYTOML_CONFIG_INSTALL_DIR}
     )
 
-    if(MYTOML_INSTALL_CPACK)
-        SET(CPACK_PACKAGE_NAME "Mytoml")
-        set(CPACK_PACKAGE_NAME_SUMMARY "Simple and Fast Toml Parser")
-        SET(CPACK_PACKAGE_CONTACT "djoezeke")
-        set(CPACK_PACKAGE_VENDOR "Mytoml Contributers")
-        set(CPACK_PACKAGE_FILE_NAME "mytoml-${PROJECT_VERSION}")
-        set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
-        set(CPACK_RESOURCE_FILE_WELCOME "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
-        set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
-        SET(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
-        set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
-        set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
-        set(CPACK_PACKAGE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
-        set(CPACK_PACKAGE_INSTALL_DIRECTORY "Mytoml ${PROJECT_VERSION}")
-        # set(CPACK_MONOLITHIC_INSTALL ON)
-        SET(CPACK_GENERATOR "ZIP;TGZ;DEB;RPM") # Remove this, if you want the NSIS installer on Windows
-        SET(CPACK_DEBIAN_PACKAGE_SHLIBDEPS OFF) # can be used to generate deps, slow and requires tools.
-        SET(CPACK_DEBIAN_PACKAGE_NAME "lib${CPACK_PACKAGE_NAME}-dev")
-        SET(CPACK_RPM_PACKAGE_NAME "lib${CPACK_PACKAGE_NAME}-devel")
-
-        include(CPack)
-
+    if(UNIX)
+        install(
+            FILES "${MYTOML_CMAKE_PACKAGE_FILE}"
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
+        )
     endif()
 
 endif()
@@ -497,19 +478,52 @@ endif()
 #--------------------------------------------------------------------
 # Package with CPack.
 #--------------------------------------------------------------------
-# TODO : Add Packing with CPack
 
-#--------------------------------------------------------------------
-# Uninstall Target
-#--------------------------------------------------------------------
+if(MYTOML_ENABLE_PACKINGK)
 
-if(MYTOML_UNINSTALL)
-    if(NOT TARGET uninstall)
-        configure_file(cmake/cmake_uninstall.cmake.in cmake_uninstall.cmake IMMEDIATE @ONLY)
-
-        add_custom_target(uninstall
-            COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake")
+    if(WIN32 AND NOT CYGWIN)
+        find_program(ARGPARSER_MAKENSIS_EXECUTABLE makensis)
+        if(ARGPARSER_MAKENSIS_EXECUTABLE)
+            set(CPACK_GENERATOR NSIS ZIP)
+        else()
+            message(STATUS "NSIS not found: falling back to ZIP package generator")
+            set(CPACK_GENERATOR ZIP)
+        endif()
     endif()
+
+    if(APPLE)
+        set(CPACK_GENERATOR DragNDrop TGZ)
+    endif()
+
+    if (UNIX AND NOT APPLE AND NOT WIN32)
+        set(CPACK_GENERATOR DEB TGZ)
+    endif ()
+
+    set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
+    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+    set(CPACK_PACKAGE_VENDOR "${PROJECT_NAME} developers")
+    set(CPACK_PACKAGE_DESCRIPTION "${PROJECT_DESCRIPTION}")
+    set(CPACK_PACKAGE_HOMEPAGE_URL "${PROJECT_HOMEPAGE_URL}")
+    set(CPACK_PACKAGE_MAINTAINER "Sackey Ezekiel Etrue")
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+    set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+
+    set(CPACK_DEBIAN_PACKAGE_NAME "${CPACK_PACKAGE_NAME}")
+    set(CPACK_DEBIAN_COMPRESSION_TYPE "xz")
+    set(CPACK_DEBIAN_PACKAGE_DEBUG OFF)
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6-dev")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${CPACK_PACKAGE_MAINTAINER}")
+    set(CPACK_DEBIAN_PACKAGE_SUGGESTS "cmake, pkg-config, pkg-conf")
+
+    set(CPACK_RPM_PACKAGE_NAME "${CPACK_PACKAGE_NAME}")
+    set(CPACK_RPM_PACKAGE_SUGGESTS "${CPACK_DEBIAN_PACKAGE_SUGGESTS}")
+
+    set(CPACK_DEB_COMPONENT_INSTALL ON)
+    set(CPACK_RPM_COMPONENT_INSTALL ON)
+    set(CPACK_NSIS_COMPONENT_INSTALL ON)
+
+    include(CPack)
+
 endif()
 
 #--------------------------------------------------------------------
@@ -533,3 +547,20 @@ add_custom_target(tidy
             -DCLANG_TIDY_EXECUTABLE=${CLANG_TIDY_EXECUTABLE}
             -P ${PROJECT_SOURCE_DIR}/cmake/Tidy.cmake
     WORKING_DIRECTORY ${PROJECT_BINARY_DIR} VERBATIM)
+
+    
+#--------------------------------------------------------------------
+# Uninstall Target
+#--------------------------------------------------------------------
+
+if(MYTOML_UNINSTALL)
+    if(NOT TARGET uninstall)
+        configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+        IMMEDIATE @ONLY)
+
+        add_custom_target(uninstall
+            COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake")
+    endif()
+endif()

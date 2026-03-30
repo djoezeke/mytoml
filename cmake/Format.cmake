@@ -1,5 +1,5 @@
 # ===================================================================
-# clang-format check script for Mytoml
+# clang-format check script
 # ===================================================================
 
 if(NOT DEFINED PROJECT_SOURCE_DIR OR PROJECT_SOURCE_DIR STREQUAL "")
@@ -21,7 +21,7 @@ if(NOT CLANG_FORMAT_BIN)
     message(FATAL_ERROR "clang-format executable not found. Set CLANG_FORMAT_EXECUTABLE or install clang-format.")
 endif()
 
-file(GLOB_RECURSE MYTOML_FORMAT_FILES
+file(GLOB_RECURSE FORMAT_FILES
     LIST_DIRECTORIES false
     "${PROJECT_SOURCE_DIR}/include/*.h"
     "${PROJECT_SOURCE_DIR}/include/*.hpp"
@@ -33,7 +33,7 @@ file(GLOB_RECURSE MYTOML_FORMAT_FILES
     "${PROJECT_SOURCE_DIR}/src/*.cxx"
 )
 
-if(MYTOML_FORMAT_FILES STREQUAL "")
+if(FORMAT_FILES STREQUAL "")
     message(STATUS "No source files found for format check")
     return()
 endif()
@@ -41,7 +41,7 @@ endif()
 set(_format_check_failed OFF)
 file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/.cmake-format")
 
-foreach(_file IN LISTS MYTOML_FORMAT_FILES)
+foreach(_file IN LISTS FORMAT_FILES)
     execute_process(
         COMMAND "${CLANG_FORMAT_BIN}" -style=file "${_file}"
         OUTPUT_VARIABLE _formatted

@@ -3,10 +3,6 @@
 # Distributed under the terms of the MIT license.
 # ===================================================================
 
-# TODO: Use FetchContent if Catch2 submodule is not found
-# TODO: Set the target flags to use the appropriate C++ standard library
-# TODO: Enable Code Coverage
-
 #--------------------------------------------------------------------
 # Basic Test Configures   
 #--------------------------------------------------------------------
@@ -16,15 +12,6 @@ set(
   GIT_TEST_SUBMODULES
   Catch2
 )
-
-# foreach (submodule IN ITEMS ${GIT_TEST_SUBMODULES})
-#   if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/${submodule}/.git")
-#   message( FATAL_ERROR "Required CMake submodule `${submodule}' not found. This \
-#   is most likely caused by an incomplete clone from the main repository. Please run:
-#   $ git submodule update --init --recursive
-# to clone all required submodules and run CMake again.")
-#   endif()
-# endforeach()
 
 # Try to use vendor submodule if present otherwise fall back to FetchContent to obtain Catch2
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/Catch2/CMakeLists.txt")
@@ -60,10 +47,6 @@ set_target_properties(Catch2WithMain PROPERTIES EXPORT_COMPILE_COMMANDS OFF)
 set_target_properties(Catch2 Catch2WithMain PROPERTIES FOLDER "Dependencies")
 get_target_property(CATCH2_INCLUDE_DIRS Catch2 INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(Catch2 SYSTEM INTERFACE ${CATCH2_INCLUDE_DIRS})
-
-file(GLOB C_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/c/*.test.cpp")
-
-file(GLOB CPP_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/cxx/*.test.cpp")
 
 #--------------------------------------------------------------------
 # Test Functions
@@ -121,21 +104,8 @@ endfunction()
 # Manually or Recursively add Tests
 #--------------------------------------------------------------------
 
-mytoml_add_test(mytoml-c-tests "${C_TEST_SRC}" "Mytoml::Mytoml")
-mytoml_add_test(mytoml-cpp-tests "${CPP_TEST_SRC}" "Mytoml::MytomlC")
+file(GLOB C_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/c/*.test.cpp")
+mytoml_add_test(mytoml-c-tests "${C_TEST_SRC}" "Mytoml::MytomlC")
 
-# # Automatically add all .c tests in this folder
-# file(GLOB C_TEST_SOURCES "*.c")
-# foreach(TEST_FILE ${C_TEST_SOURCES})
-#   get_filename_component(TEST_NAME ${TEST_FILE} NAME_WE)
-#   mytoml_add_test("${TEST_NAME}" "${TEST_FILE}" "Mytoml::MytomlC")
-# endforeach()
-
-# # Automatically add all .cpp tests in this folder
-# file(GLOB CPP_TEST_SOURCES "*.cpp")
-# foreach(TEST_FILE ${CPP_TEST_SOURCES})
-#   get_filename_component(TEST_NAME ${TEST_FILE} NAME_WE)
-#   mytoml_add_test("${TEST_NAME}" "${TEST_FILE}" "Mytoml::Mytoml")
-# endforeach()
-
-# TODO: Add Convenience for building and running tests in a single command
+file(GLOB CPP_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/cxx/*.test.cpp")
+mytoml_add_test(mytoml-cpp-tests "${CPP_TEST_SRC}" "Mytoml::Mytoml")
