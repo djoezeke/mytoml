@@ -8,13 +8,13 @@
 #--------------------------------------------------------------------
 
 project('mytoml',
-	'cpp',
+	['c', 'cpp'],
 	version : '0.1.0',
 	license : 'MIT',
 	default_options : [
 		'buildtype=release',
-		'default_library=static',
-		'cpp_std=c++17'
+		'default_library=' + get_option('mytoml_default_library'),
+		'cpp_std=' + get_option('mytoml_cpp_std')
 		]
 )
 
@@ -34,6 +34,8 @@ mytoml_is_subproject = meson.is_subproject()
 mytoml_include_dirs = include_directories('include')
 mytoml_build_tests = get_option('mytoml_build_tests') and not mytoml_is_subproject
 mytoml_build_examples = get_option('mytoml_build_examples') and not mytoml_is_subproject
+mytoml_install = get_option('mytoml_install') and not mytoml_is_subproject
+mytoml_build_c_api = get_option('mytoml_build_c_api')
 
 src_files = []
 
@@ -45,24 +47,38 @@ src_files = []
 # Build C++ Library        #
 #===========================
 
-mytoml_lib = static_library(
+mytoml_lib = library(
 	'mytoml',
 	'src/mytoml.cpp',
 	include_directories : mytoml_include_dirs,
-	install : true,
+	install : mytoml_install,
 )
 
 #===========================
 # Build C Library          #
 #===========================
 
-mytomlc_lib = static_library(
-	'mytomlc', 
-	'src/mytomlc.cpp',
-	include_directories : mytoml_include_dirs,
+mytoml_dep = declare_dependency(
 	link_with : mytoml_lib,
-	install : true,
+	include_directories : mytoml_include_dirs,
 )
+
+mytomlc_dep = mytoml_dep
+
+if mytoml_build_c_api
+	mytomlc_lib = library(
+		'mytomlc', 
+		'src/mytomlc.cpp',
+		include_directories : mytoml_include_dirs,
+		link_with : mytoml_lib,
+		install : mytoml_install,
+	)
+
+	mytomlc_dep = declare_dependency(
+		link_with : mytomlc_lib,
+		include_directories : mytoml_include_dirs,
+	)
+endif
 
 #--------------------------------------------------------------------
 # Add Project subdirectories.
@@ -82,15 +98,23 @@ endif
 
 if not meson.is_subproject()
 
-	install_headers('include/mytoml/mytoml.h', subdir : 'mytoml')
-	install_headers('include/mytoml/mytoml.hpp', subdir : 'mytoml')
+	if mytoml_install
+		install_headers('include/mytoml/mytoml.h', subdir : 'mytoml')
+		install_headers('include/mytoml/mytoml.hpp', subdir : 'mytoml')
+	endif
 
 	pkgc = import('pkgconfig')
+	pkg_libraries = [mytoml_lib]
+	if mytoml_build_c_api
+		pkg_libraries += [mytomlc_lib]
+	endif
 	pkgc.generate(
 		name : meson.project_name(),
 		version: meson.project_version(),
 		description: 'TOML for Modern C/C++',
 		url: 'https://github.com/djoezeke/mytoml',
+		libraries: pkg_libraries,
+		subdirs : 'mytoml',
 	)
 
 endif

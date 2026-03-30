@@ -7,37 +7,51 @@
   },
   "configurePresets": [
     {
-      "name": "default",
-      "hidden": false,
+      "name": "base",
+      "hidden": true,
       "generator": "Ninja",
-      "binaryDir": "build",
       "installDir": "${sourceDir}/build/install",
-      "description": "Default build with static library, examples, and tests enabled",
       "cacheVariables": {
         "CMAKE_C_EXTENSIONS": "OFF",
         "CMAKE_CXX_EXTENSIONS": "OFF",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "MYTOML_BUILD_CMYTOML": "ON",
         "MYTOML_BUILD_TESTS": "ON",
-        "MYTOML_BUILD_DEBUG": "OFF",
-        "MYTOML_BUILD_SHARED": "ON",
-        "MYTOML_BUILD_EXAMPLES": "ON"
+        "MYTOML_BUILD_EXAMPLES": "ON",
+        "MYTOML_INSTALL": "ON"
+      }
+    },
+    {
+      "name": "default",
+      "hidden": false,
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/default",
+      "description": "Default Release build with static libraries, examples, and tests enabled",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_SHARED_LIBS": "OFF"
+      }
+    },
+    {
+      "name": "shared",
+      "hidden": false,
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/shared",
+      "description": "Release build with shared libraries, examples, and tests enabled",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_SHARED_LIBS": "ON"
       }
     },
     {
       "name": "develop",
       "hidden": false,
-      "generator": "Ninja",
+      "inherits": "base",
       "binaryDir": "${sourceDir}/build/develop",
-      "installDir": "${sourceDir}/build/install",
-      "description": "Debug build for development with examples and tests enabled",
+      "description": "Debug build for development with static libraries, examples, and tests enabled",
       "cacheVariables": {
-        "CMAKE_C_EXTENSIONS": "OFF",
-        "CMAKE_CXX_EXTENSIONS": "OFF",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "MYTOML_BUILD_TESTS": "ON",
-        "MYTOML_BUILD_DEBUG": "ON",
-        "MYTOML_BUILD_SHARED": "ON",
-        "MYTOML_BUILD_EXAMPLES": "ON"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_SHARED_LIBS": "OFF"
       }
     }
   ],
@@ -45,6 +59,13 @@
     {
       "name": "default",
       "configurePreset": "default",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "shared",
+      "configurePreset": "shared",
       "output": {
         "outputOnFailure": true
       }

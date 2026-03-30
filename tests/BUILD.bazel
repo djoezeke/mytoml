@@ -10,8 +10,7 @@
 cc_test(
 	name = "mytoml_test",
 	srcs = ["cxx/Version.test.cpp"],
-	deps = [":mytoml", "//vendor/Catch2:catch2_main"],
-	includes = ["include"],
+	deps = ["//:mytoml", "//tests/vendor/Catch2:catch2_main"],
 )
 
 #===========================
@@ -20,9 +19,8 @@ cc_test(
 
 cc_test(
 	name = "mytomlc_test",
-	srcs = ["c/Version.test.cpp"],
-	deps = [":mytomlc", "//vendor/Catch2:catch2_main"],
-	includes = ["include"],
+	srcs = ["c/Main.test.cpp"],
+	deps = ["//:mytomlc", "//tests/vendor/Catch2:catch2_main"],
 )
 
 # ===================================================================

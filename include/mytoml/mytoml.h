@@ -229,8 +229,6 @@ extern "C"
 
     /** Enumerations */
 
-    enum mtEncoding;
-
     /** Structures */
 
     struct mtVersion;

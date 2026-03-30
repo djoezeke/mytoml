@@ -30,6 +30,8 @@ function(mytoml_add_example target)
     # create the target
     add_executable(${target} ${THIS_SOURCES})
 
+    target_include_directories(${target} PRIVATE ${MYTOML_INCLUDE_BUILD_DIR})
+
     # set the target's folder (for IDEs that support it, e.g. Visual Studio)
     set_target_properties(${target} PROPERTIES FOLDER "Examples")
 

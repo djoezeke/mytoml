@@ -2,18 +2,23 @@ name: CI
 
 on:
   push:
-    branches: [dev, main]
+    branches: [main, dev]
   pull_request:
-    branches: [dev, main]
+    branches: [main, dev]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  build:
-    name: Build and Test on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        # allow the job to continue on a single axis failure if desired
+  clang:
+    name: Clang Lint (ubuntu)
+    runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,48 +26,129 @@ jobs:
       - name: Setup CMake
         uses: jwlawson/actions-setup-cmake@v2
         with:
-          cmake-version: "3.26.4"
+          cmake-version: "3.29.6"
 
-      - name: Configure (develop preset)
+      - name: Install clang tools
         run: |
-          cmake --preset develop
-        working-directory: .
+          sudo apt-get update
+          sudo apt-get install -y clang-format clang-tidy
+
+      - name: Check formatting
+        run: |
+          mapfile -t files < <(git ls-files '*.c' '*.h' '*.cpp' '*.hpp' '*.cc' '*.hh' '*.cxx' '*.hxx')
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No source files found for format check"
+            exit 0
+          fi
+
+          failed=0
+          for f in "${files[@]}"; do
+            if ! diff -u "$f" <(clang-format -style=file "$f") >/dev/null; then
+              echo "Formatting mismatch: $f"
+              failed=1
+            fi
+          done
+
+          if [ $failed -ne 0 ]; then
+            echo "clang-format check failed"
+            exit 1
+          fi
+
+      - name: Configure for clang-tidy
+        run: cmake --preset default -B build-tidy -DMYTOML_BUILD_TESTS=OFF -DMYTOML_BUILD_EXAMPLES=OFF
+
+      - name: Run clang-tidy
+        run: |
+          clang-tidy src/mytoml.cpp src/mytomlc.cpp -p build-tidy -- -Iinclude
+
+  cmake:
+    name: CMake (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        preset: [default, shared]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: "3.29.6"
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
 
       - name: Build
-        run: |
-          cmake --build debug --config Release -- -j 2
-        working-directory: .
+        run: cmake --build build/${{ matrix.preset }} --config Release
 
-      - name: Run tests
-        if: always()
-        run: |
-          ctest --test-dir debug --output-on-failure -C Release
-        working-directory: .
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }}
 
-      - name: clang-format check
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          if command -v clang-format >/dev/null 2>&1; then
-            echo 'Running clang-format check'
-            clang-format --version
-            git diff --quiet || (echo 'Repo not clean before format check'; exit 1)
-            # check formatting (this assumes project contains .clang-format)
-            files=$(git ls-files '*.c' '*.h' '*.cpp' '*.hpp')
-            for f in $files; do
-              clang-format -style=file $f | diff -u $f - || (echo "File $f needs formatting"; exit 1)
-            done
-          else
-            echo 'clang-format not installed; skipping format check'
-          fi
+      - name: Upload CTest logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-logs-${{ matrix.os }}-${{ matrix.preset }}
+          path: |
+            build/${{ matrix.preset }}/Testing/**
 
-      - name: clang-tidy
-        if: matrix.os == 'ubuntu-latest'
+  meson:
+    name: Meson (ubuntu, ${{ matrix.default_library }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        default_library: [static, shared]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Meson and Ninja
         run: |
-          if command -v clang-tidy >/dev/null 2>&1; then
-            echo 'Running clang-tidy (minimal invocation)'
-            # Minimal run over sources; adapt checks as needed
-            clang-tidy src/myyaml.c -- -Iinclude || true
-          else
-            echo 'clang-tidy not installed; skipping'
-          fi
-        working-directory: .
+          python -m pip install --upgrade pip
+          python -m pip install meson ninja
+
+      - name: Configure
+        run: meson setup build-meson-${{ matrix.default_library }} -Dmytoml_build_tests=true -Dmytoml_build_examples=true -Dmytoml_default_library=${{ matrix.default_library }}
+
+      - name: Build
+        run: meson compile -C build-meson-${{ matrix.default_library }}
+
+      - name: Test
+        run: meson test -C build-meson-${{ matrix.default_library }} --print-errorlogs
+
+  bazel:
+    name: Bazel (ubuntu)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bazel
+        uses: bazelbuild/setup-bazelisk@v3
+
+      - name: Cache Bazel outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/bazel
+          key: ${{ runner.os }}-bazel-${{ hashFiles('MODULE.bazel', 'BUILD.bazel', 'tests/BUILD.bazel') }}
+          restore-keys: |
+            ${{ runner.os }}-bazel-
+
+      - name: Build
+        run: bazel build //:mytoml //:mytomlc
+
+      - name: Test
+        run: bazel test //tests:mytoml_test //tests:mytomlc_test --test_output=errors

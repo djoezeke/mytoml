@@ -15,9 +15,10 @@ if mytoml_build_examples
     foreach example : mytoml_examples
 
 		exe = executable(
-            example, example,
-            include_directories: incdir,
-            link_with: [mytoml_lib],
+                        example,
+                        'apis/' + example,
+                        include_directories: mytoml_include_dirs,
+                        dependencies: [mytoml_dep],
             install: false
         )
         
@@ -31,10 +32,11 @@ if mytoml_build_examples
 
     foreach example : mytomlc_examples
 
-		exe = executable(example + 'c',
+		exe = executable(
+                        example + 'c',
             'apis/' + example,
-            include_directories: incdir,
-            link_with: [mytomlc_lib], 
+                        include_directories: mytoml_include_dirs,
+                        dependencies: [mytomlc_dep],
             install: false
         )
 

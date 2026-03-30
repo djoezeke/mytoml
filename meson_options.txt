@@ -1,3 +1,6 @@
 option('mytoml_install', type: 'boolean', value: true, description: 'Install the library')
 option('mytoml_build_tests', type: 'boolean', value: false, description: 'Build Tests (default: false)')
 option('mytoml_build_examples', type: 'boolean', value: false, description: 'Build Examples (default: false)')
+option('mytoml_build_c_api', type: 'boolean', value: true, description: 'Build C API library (mytomlc)')
+option('mytoml_default_library', type: 'combo', choices: ['static', 'shared', 'both'], value: 'static', description: 'Library type to build')
+option('mytoml_cpp_std', type: 'combo', choices: ['c++11', 'c++14', 'c++17', 'c++20', 'c++23'], value: 'c++17', description: 'C++ language standard')

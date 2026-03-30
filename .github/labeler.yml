@@ -1,0 +1,84 @@
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - README.md
+          - docs/**
+
+mkdocs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - docs/mkdocs/**
+
+examples:
+  - changed-files:
+      - any-glob-to-any-file:
+          - examples/**
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - tests/**
+
+c:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.c"
+          - "**/*.h"
+          - include/mytoml/mytoml.h
+          - src/mytomlc.cpp
+
+cxx:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.cpp"
+          - "**/*.hpp"
+          - include/mytoml/mytoml.hpp
+          - src/mytoml.cpp
+
+build:
+  - changed-files:
+      - any-glob-to-any-file:
+          - CMakeLists.txt
+          - "**/CMakeLists.txt"
+          - CMakePresets.json
+          - cmake/**
+          - meson.build
+          - "**/meson.build"
+          - meson_options.txt
+          - BUILD.bazel
+          - "**/BUILD.bazel"
+          - MODULE.bazel
+          - Makefile
+
+cmake:
+  - changed-files:
+      - any-glob-to-any-file:
+          - CMakeLists.txt
+          - "**/CMakeLists.txt"
+          - CMakePresets.json
+          - cmake/**
+
+meson:
+  - changed-files:
+      - any-glob-to-any-file:
+          - meson.build
+          - "**/meson.build"
+          - meson_options.txt
+
+bazel:
+  - changed-files:
+      - any-glob-to-any-file:
+          - BUILD.bazel
+          - "**/BUILD.bazel"
+          - MODULE.bazel
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/workflows/**
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/dependabot.yml
+          - tests/vendor/**

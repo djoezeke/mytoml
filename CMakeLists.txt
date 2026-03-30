@@ -148,11 +148,11 @@ else()
 endif()
 
 # Add compiler warnings
-if(MYTOML_ENABLE_WARNINGS)
+if(MYTOML_ENABLE_WARNING)
     if(MSVC)
-        set(MYTOML_WARNINGS /WX /W4 /permissive-)
+        set(MYTOML_WARNINGS /W4 /permissive-)
     elseif(CMAKE_CXX_COMPILER_ID MATCHES "(GNU|Clang)")
-        set(MYTOML_WARNINGS -Werror -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion)
+        set(MYTOML_WARNINGS -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion)
     endif()
 endif()
 
@@ -175,7 +175,7 @@ if(MYTOML_ENABLE_STDLIB_ASSERTIONS)
 endif()
 
 set(MYTOML_CMAKE_CONFIG_NAME "${PROJECT_NAME}Config")
-set(MYTOML_CMAKE_TARGET_NAME "${PROJECT_NAME}Target")
+set(MYTOML_CMAKE_TARGET_NAME "${PROJECT_NAME}Targets")
 
 set(MYTOML_INCLUDE_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 set(MYTOML_INCLUDE_INSTALL_DIR "${CMAKE_INSTALL_INCLUDEDIR}")
@@ -184,7 +184,7 @@ set(MYTOML_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_DATADIR}/cmake/${PROJECT_NAME}" C
 set(MYTOML_CMAKE_CONFIG_TEMPLATE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(MYTOML_CMAKE_CONFIG_TEMPLATE "${MYTOML_CMAKE_CONFIG_TEMPLATE_DIR}/${MYTOML_CMAKE_CONFIG_NAME}.cmake.in")
 set(MYTOML_CMAKE_VERSION_CONFIG_TEMPLATE "${MYTOML_CMAKE_CONFIG_TEMPLATE_DIR}/${MYTOML_CMAKE_CONFIG_NAME}Version.cmake.in")
-set(MYTOML_CMAKE_PACKAGE_CONFIG_TEMPLATE "${MYTOML_CMAKE_CONFIG_TEMPLATE_DIR}/pkg-config.pc.in")
+set(MYTOML_CMAKE_PACKAGE_CONFIG_TEMPLATE "${MYTOML_CMAKE_CONFIG_TEMPLATE_DIR}/${PROJECT_NAME}.pc.in")
 
 set(MYTOML_CMAKE_CONFIG_DIR  ${CMAKE_CURRENT_BINARY_DIR})
 set(MYTOML_CMAKE_CONFIG_FILE  ${MYTOML_CMAKE_CONFIG_DIR}/${PROJECT_NAME}Config.cmake)
@@ -205,7 +205,7 @@ include(CMakeParseArguments)
 macro(mytoml_make_library library)
 
     # parse the arguments
-    cmake_parse_arguments(THIS "" "DEPENDS" "SOURCES" ${ARGN})
+    cmake_parse_arguments(THIS "" "" "SOURCES;DEPENDS" ${ARGN})
     if(NOT "${THIS_UNPARSED_ARGUMENTS}" STREQUAL "")
         message(FATAL_ERROR "Extra unparsed arguments when calling mytoml_make_library: ${THIS_UNPARSED_ARGUMENTS}")
     endif()
@@ -231,7 +231,7 @@ macro(mytoml_make_library library)
     set_target_properties(${target} PROPERTIES DEFINE_SYMBOL ${NAME_UPPER}_EXPORTS)
 
     # define the export name of the library
-    set_target_properties(${target} PROPERTIES EXPORT_NAME Mytoml::${library})
+    set_target_properties(${target} PROPERTIES EXPORT_NAME ${library})
 
     # set the target's folder (for IDEs that support it, e.g. Visual Studio)
     set_target_properties(${target} PROPERTIES FOLDER "Mytoml")
@@ -239,8 +239,12 @@ macro(mytoml_make_library library)
     # add <project>/include as public include directory
     target_include_directories(${target} 
         PUBLIC $<BUILD_INTERFACE:${MYTOML_INCLUDE_BUILD_DIR}>
-        INTERFACE $<INSTALL_INTERFACE:${MYTOML_INCLUDE_INSTALL_DIR}>
+        PUBLIC $<INSTALL_INTERFACE:${MYTOML_INCLUDE_INSTALL_DIR}>
     )
+
+    if(THIS_DEPENDS)
+        target_link_libraries(${target} PUBLIC ${THIS_DEPENDS})
+    endif()
 
     if(NOT MYTOML_STATIC)
         set_target_properties(${target} PROPERTIES DEBUG_POSTFIX -d)
@@ -266,9 +270,9 @@ macro(mytoml_make_library library)
     set_target_properties(${target} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
     set_target_properties(${target} PROPERTIES VERSION ${PROJECT_VERSION})
 
-    foreach(WARNING ${MYTOML_WARNINGS})
-        set_target_properties(${target} PROPERTIES APPEND_STRING COMPILE_FLAGS " ${WARNING}")
-    endforeach()
+    if(MYTOML_WARNINGS)
+        target_compile_options(${target} PRIVATE ${MYTOML_WARNINGS})
+    endif()
 
     if(NOT MYTOML_STATIC)
         # define MYTOML_BUILD_SHARED if the build type is set to 'shared'
@@ -327,11 +331,16 @@ mytoml_make_library(Mytoml
                     SOURCES src/mytoml.cpp
                     )
 
+set(MYTOML_EXPORT_TARGETS mytoml)
+
 # define the mytomlc target
-mytoml_make_library(MytomlC
-                    SOURCES src/mytomlc.cpp
-                    DEPENDS Mytoml::Mytoml
-                    )
+if(MYTOML_BUILD_CMYTOML)
+    mytoml_make_library(MytomlC
+                        SOURCES src/mytomlc.cpp
+                        DEPENDS Mytoml::Mytoml
+                        )
+    list(APPEND MYTOML_EXPORT_TARGETS mytomlc)
+endif()
 
 #--------------------------------------------------------------------
 # Configurations
@@ -423,37 +432,36 @@ configure_file(
 #--------------------------------------------------------------------
 
 if(MYTOML_INSTALL)
-    # install(
-    #     DIRECTORY ${MYTOML_INCLUDE_BUILD_DIR}
-    #     DESTINATION ${MYTOML_INCLUDE_INSTALL_DIR}
-    # )
+    install(
+        DIRECTORY ${MYTOML_INCLUDE_BUILD_DIR}/mytoml
+        DESTINATION ${MYTOML_INCLUDE_INSTALL_DIR}
+    )
 
-    # install(
-    #     FILES ${MYTOML_CMAKE_CONFIG_FILE} ${MYTOML_CMAKE_VERSION_CONFIG_FILE}
-    #     DESTINATION ${MYTOML_CONFIG_INSTALL_DIR}
-    # )
+    install(
+        FILES ${MYTOML_CMAKE_CONFIG_FILE} ${MYTOML_CMAKE_VERSION_CONFIG_FILE}
+        DESTINATION ${MYTOML_CONFIG_INSTALL_DIR}
+    )
 
-    # export(
-    #     TARGETS ${MYTOML_TARGET_NAME}
-    #     NAMESPACE ${PROJECT_NAME}::
-    #     FILE ${MYTOML_CMAKE_TARGETS_FILE}
-    # )
+    install(
+        TARGETS ${MYTOML_EXPORT_TARGETS}
+        EXPORT ${MYTOML_CMAKE_TARGET_NAME}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        INCLUDES DESTINATION ${MYTOML_INCLUDE_INSTALL_DIR}
+    )
 
-    # install(
-    #     TARGETS ${MYTOML_TARGET_NAME}
-    #     EXPORT ${MYTOML_CMAKE_TARGET_NAME}
-    # )
+    install(
+        EXPORT ${MYTOML_CMAKE_TARGET_NAME}
+        NAMESPACE ${PROJECT_NAME}::
+        FILE ${MYTOML_CMAKE_TARGET_NAME}.cmake
+        DESTINATION ${MYTOML_CONFIG_INSTALL_DIR}
+    )
 
-    # install(
-    #     EXPORT ${MYTOML_CMAKE_TARGET_NAME}
-    #     NAMESPACE ${PROJECT_NAME}::
-    #     DESTINATION ${MYTOML_CONFIG_INSTALL_DIR}
-    # )
-
-    # install(
-    #     FILES "${MYTOML_CMAKE_PACKAGE_FILE}"
-    #     DESTINATION ${MYTOML_CONFIG_INSTALL_DIR}
-    # )
+    install(
+        FILES "${MYTOML_CMAKE_PACKAGE_FILE}"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
+    )
 
     if(MYTOML_INSTALL_CPACK)
         SET(CPACK_PACKAGE_NAME "Mytoml")
@@ -481,9 +489,10 @@ if(MYTOML_INSTALL)
 
 endif()
 
-
-install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DOCDIR})
-install(FILES README.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+if(MYTOML_INSTALL AND MYTOML_INSTALL_DOCS)
+    install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DOCDIR})
+    install(FILES README.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+endif()
 
 #--------------------------------------------------------------------
 # Package with CPack.

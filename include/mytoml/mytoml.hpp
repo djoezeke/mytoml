@@ -154,6 +154,10 @@
 #include <functional>
 #include <ostream>
 #include <istream>
+#include <string>
+#include <vector>
+#include <map>
+#include <variant>
 
 #include <stdio.h>
 #include <stdint.h>
@@ -956,6 +960,17 @@ namespace mytoml
             stream_end,
             end_of_input,
             stream_start,
+            object_start,
+            object_end,
+            array_start,
+            array_end,
+            name_separator,
+            value_separator,
+            string_value,
+            number_value,
+            true_literal,
+            false_literal,
+            null_literal,
         };
 
         enum class error_t : uint8_t
@@ -2001,6 +2016,12 @@ namespace mytoml
     enum class node_t : uint8_t
     {
         unknown,
+        table,
+        array,
+        string,
+        integer,
+        floating,
+        boolean
     };
 
     /** @} */
@@ -2201,7 +2222,44 @@ namespace mytoml
      */
     class toml
     {
-        int m_int;
+    public:
+        using table_t = std::map<std::string, toml>;
+        using array_t = std::vector<toml>;
+        using value_t = std::variant<std::nullptr_t, table_t, array_t, std::string, int64_t, double, bool>;
+
+        toml();
+        toml(table_t value);
+        toml(array_t value);
+        toml(std::string value);
+        toml(const char *value);
+        toml(int64_t value);
+        toml(double value);
+        toml(bool value);
+
+        static toml parse(const std::string &text);
+
+        node_t type() const noexcept;
+        bool is_table() const noexcept;
+        bool is_array() const noexcept;
+        bool is_string() const noexcept;
+        bool is_integer() const noexcept;
+        bool is_floating() const noexcept;
+        bool is_boolean() const noexcept;
+
+        table_t &as_table();
+        const table_t &as_table() const;
+        array_t &as_array();
+        const array_t &as_array() const;
+        std::string &as_string();
+        const std::string &as_string() const;
+        int64_t as_integer() const;
+        double as_floating() const;
+        bool as_boolean() const;
+
+        std::string dump(int indent = 0) const;
+
+    private:
+        value_t m_value;
     };
 
     /** @} */

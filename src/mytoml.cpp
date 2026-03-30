@@ -60,7 +60,11 @@
 // [SECTION] INCLUDES
 //-------------------------------------------------------------------------
 
+#define MYTOML_IMPLEMENTATION 1
+
+#include <cctype>
 #include <mytoml/mytoml.hpp>
+#include <sstream>
 
 #ifdef MYTOML_IMPLEMENTATION
 
@@ -639,11 +643,11 @@ namespace mytoml
         // payload into UTF-8 bytes stored in m_input. This approach simplifies
         // tokenization: subsequent get_char() returns UTF-8 bytes only.
         lexer::lexer(iadapter *adapter)
-            : m_position{}, m_token{}, m_string(), m_adapter(adapter), m_encoding(mytoml::encoding::unspecified), m_putback(-1)
+            : m_adapter(adapter), m_encoding(mytoml::encoding::unspecified), m_string(), m_input{}, m_input_pos(0), m_putback(-1), m_position{}, m_token{}, m_char(EOF)
         {
             if (!m_adapter)
             {
-                m_input_pos = 0;
+                m_token.type = token_t::end_of_input;
                 return;
             }
 
@@ -678,67 +682,62 @@ namespace mytoml
             size_t skip = 0;
             switch (m_encoding)
             {
-            case mytoml::encoding::utf8:
-                // UTF-8 BOM is 3 bytes
+            case encoding::utf8:
                 if (raw.size() >= 3 && !memcmp(raw.data(), MYTOML_BOM_UTF8, 3))
                     skip = 3;
                 break;
-            case mytoml::encoding::utf16le:
-            case mytoml::encoding::utf16be:
-                // UTF-16 BOM is 2 bytes
-                if (raw.size() >= 2 && (!memcmp(raw.data(), MYTOML_BOM_UTF16LE, 2) || !memcmp(raw.data(), MYTOML_BOM_UTF16BE, 2)))
+            case encoding::utf16le:
+                if (raw.size() >= 2 && !memcmp(raw.data(), MYTOML_BOM_UTF16LE, 2))
                     skip = 2;
                 break;
-            case mytoml::encoding::utf32le:
-            case mytoml::encoding::utf32be:
-                // UTF-32 BOM is 4 bytes
-                if (raw.size() >= 4 && (!memcmp(raw.data(), MYTOML_BOM_UTF32LE, 4) || !memcmp(raw.data(), MYTOML_BOM_UTF32BE, 4)))
+            case encoding::utf16be:
+                if (raw.size() >= 2 && !memcmp(raw.data(), MYTOML_BOM_UTF16BE, 2))
+                    skip = 2;
+                break;
+            case encoding::utf32le:
+                if (raw.size() >= 4 && !memcmp(raw.data(), MYTOML_BOM_UTF32LE, 4))
+                    skip = 4;
+                break;
+            case encoding::utf32be:
+                if (raw.size() >= 4 && !memcmp(raw.data(), MYTOML_BOM_UTF32BE, 4))
                     skip = 4;
                 break;
             default:
+                m_encoding = encoding::utf8;
                 break;
             }
 
-            // Create a vector without BOM for conversion/consumption
-            std::vector<unsigned char> payload;
-            if (skip < raw.size())
-                payload.insert(payload.end(), raw.begin() + skip, raw.end());
+            if (skip > raw.size())
+                skip = 0;
 
-            // Convert to UTF-8 if necessary, otherwise copy bytes directly.
-            if (m_encoding == mytoml::encoding::utf16le || m_encoding == mytoml::encoding::utf16be || m_encoding == mytoml::encoding::utf16)
+            const std::vector<unsigned char> payload(raw.begin() + static_cast<std::ptrdiff_t>(skip), raw.end());
+
+            if (m_encoding == encoding::utf16le)
             {
-                endian order = (m_encoding == mytoml::encoding::utf16be) ? endian::big : endian::little;
-                std::string utf8 = utf16::to_utf8(payload, order);
-                m_input.assign(utf8.begin(), utf8.end());
+                m_input = utf16::to_utf8(payload, endian::little);
             }
-            else if (m_encoding == mytoml::encoding::utf32le || m_encoding == mytoml::encoding::utf32be || m_encoding == mytoml::encoding::utf32)
+            else if (m_encoding == encoding::utf16be)
             {
-                endian order = (m_encoding == mytoml::encoding::utf32be) ? endian::big : endian::little;
-                std::string utf8 = utf32::to_utf8(payload, order);
-                m_input.assign(utf8.begin(), utf8.end());
+                m_input = utf16::to_utf8(payload, endian::big);
+            }
+            else if (m_encoding == encoding::utf32le)
+            {
+                m_input = utf32::to_utf8(payload, endian::little);
+            }
+            else if (m_encoding == encoding::utf32be)
+            {
+                m_input = utf32::to_utf8(payload, endian::big);
             }
             else
             {
-                // Treat as UTF-8 or unspecified: copy bytes directly
-                m_input.assign(reinterpret_cast<char *>(payload.data()), reinterpret_cast<char *>(payload.data()) + payload.size());
+                m_input.assign(reinterpret_cast<const char *>(payload.data()), payload.size());
             }
 
             m_input_pos = 0;
-        };
-
-        token lexer::scan()
-        {
-            m_token.text.clear();
+            m_position = mark{};
+            m_token = token{};
             m_token.type = token_t::unknown;
-            m_char = skip_ws();
-
-            if (m_char == EOF)
-            {
-                m_token.type = token_t::end_of_input;
-                return m_token;
-            }
-            m_token.type = token_t::unknown;
-            return m_token;
+            m_char = m_input.empty() ? EOF : static_cast<unsigned char>(m_input[0]);
         };
 
         mark lexer::position() const
@@ -1419,63 +1418,8 @@ namespace mytoml
     // - operator>>()
     //-----------------------------------------------------------------------------
 
-    const char *string(encoding type)
-    {
-        switch (type)
-        {
-        case encoding::utf8:
-            return "utf8";
-        case encoding::utf16:
-            return "utf16";
-        case encoding::utf16le:
-            return "utf16le";
-        case encoding::utf16be:
-            return "utf16be";
-        case encoding::utf32:
-            return "utf32";
-        case encoding::utf32le:
-            return "utf32le";
-        case encoding::utf32be:
-            return "utf32be";
-        default:
-            return "unspecified";
-        }
-    };
-
-    const char *string(node_t type)
-    {
-        switch (type)
-        {
-        default:
-            return "unknown";
-        }
-    };
-
-#ifndef MYTOML_NO_STL
-
-    std::ostream &operator<<(std::ostream &ostream, const encoding &type)
-    {
-        ostream << string(type);
-        return ostream;
-    };
-
-    std::ostream &operator<<(std::ostream &ostream, const node_t &type)
-    {
-        ostream << string(type);
-        return ostream;
-    };
-
-    std::ostream &operator<<(std::ostream &ostream, const toml &node)
-    {
-        return ostream;
-    };
-
-    std::istream &operator>>(std::istream &ostream, const toml &node)
-    {
-        return ostream;
-    };
-
-#endif // MYTOML_NO_STL
+    // Implementations for these APIs are provided in the consolidated section
+    // later in this translation unit.
 
 #ifndef MYTOML_NO_EXCEPTIONS
 
@@ -1625,29 +1569,7 @@ namespace mytoml
         // [SECTION] Literals : Toml
         //-----------------------------------------------------------------------------
 
-        MYTOML_INLINE toml MYTOML_QUOTE_OPERATOR(const char *string, size_t size)
-        {
-            return toml{};
-        };
-
-#if MYTOML_HAS_CHAR8_T
-
-        MYTOML_INLINE toml MYTOML_QUOTE_OPERATOR(const char8_t *string, size_t size)
-        {
-            return toml{};
-        };
-
-#endif // MYTOML_HAS_CHAR8_T
-
-        MYTOML_INLINE toml MYTOML_QUOTE_OPERATOR(const char16_t *string, size_t size)
-        {
-            return toml{};
-        };
-
-        MYTOML_INLINE toml MYTOML_QUOTE_OPERATOR(const char32_t *string, size_t size)
-        {
-            return toml{};
-        };
+        // Literal operators implemented in later section.
 
     }; // namespace literals
 
@@ -1658,6 +1580,520 @@ namespace mytoml
 #pragma endregion // Literal
 
 #endif // MYTOML_IMPLEMENTATION
+
+//==============================================================================
+// Minimal TOML value implementation (tables, arrays, scalars) + parse/emit
+//==============================================================================
+
+namespace
+{
+    using namespace mytoml;
+
+    inline std::string ltrim(std::string s)
+    {
+        size_t i = 0;
+        while (i < s.size() && std::isspace(static_cast<unsigned char>(s[i])))
+            ++i;
+        s.erase(0, i);
+        return s;
+    }
+
+    inline std::string rtrim(std::string s)
+    {
+        size_t i = s.size();
+        while (i > 0 && std::isspace(static_cast<unsigned char>(s[i - 1])))
+            --i;
+        s.erase(i);
+        return s;
+    }
+
+    inline std::string trim(const std::string &s) { return rtrim(ltrim(s)); }
+
+    toml parse_value(const std::string &text);
+
+    std::vector<std::string> split_top_level(const std::string &text, char delim)
+    {
+        std::vector<std::string> parts;
+        std::string current;
+        int depth_brace = 0;
+        int depth_bracket = 0;
+        bool in_string = false;
+        for (size_t i = 0; i < text.size(); ++i)
+        {
+            char c = text[i];
+            if (c == '"' && (i == 0 || text[i - 1] != '\\'))
+                in_string = !in_string;
+            if (!in_string)
+            {
+                if (c == '{')
+                    ++depth_brace;
+                else if (c == '}')
+                    --depth_brace;
+                else if (c == '[')
+                    ++depth_bracket;
+                else if (c == ']')
+                    --depth_bracket;
+                else if (c == delim && depth_brace == 0 && depth_bracket == 0)
+                {
+                    parts.push_back(trim(current));
+                    current.clear();
+                    continue;
+                }
+            }
+            current.push_back(c);
+        }
+        if (!current.empty())
+            parts.push_back(trim(current));
+        return parts;
+    }
+
+    toml parse_inline_table(const std::string &body)
+    {
+        toml::table_t table;
+        auto parts = split_top_level(body, ',');
+        for (const auto &entry : parts)
+        {
+            if (entry.empty())
+                continue;
+            auto eq = entry.find('=');
+            if (eq == std::string::npos)
+                throw parse_error("invalid inline table entry");
+            auto key = trim(entry.substr(0, eq));
+            auto value_text = trim(entry.substr(eq + 1));
+            table[key] = parse_value(value_text);
+        }
+        return toml{table};
+    }
+
+    toml parse_array(const std::string &body)
+    {
+        toml::array_t arr;
+        auto parts = split_top_level(body, ',');
+        for (const auto &entry : parts)
+        {
+            if (entry.empty())
+                continue;
+            arr.push_back(parse_value(entry));
+        }
+        return toml{arr};
+    }
+
+    toml parse_string(const std::string &text)
+    {
+        if (text.size() < 2 || text.front() != '"' || text.back() != '"')
+            throw parse_error("invalid string literal");
+        std::string out;
+        for (size_t i = 1; i + 1 < text.size(); ++i)
+        {
+            char c = text[i];
+            if (c == '\\' && i + 1 < text.size() - 1)
+            {
+                char n = text[++i];
+                switch (n)
+                {
+                case 'n':
+                    out.push_back('\n');
+                    break;
+                case 't':
+                    out.push_back('\t');
+                    break;
+                case '"':
+                    out.push_back('"');
+                    break;
+                case '\\':
+                    out.push_back('\\');
+                    break;
+                default:
+                    out.push_back(n);
+                    break;
+                }
+            }
+            else
+            {
+                out.push_back(c);
+            }
+        }
+        return toml{out};
+    }
+
+    toml parse_value(const std::string &raw)
+    {
+        auto text = trim(raw);
+        if (text.empty())
+            throw parse_error("empty value");
+
+        // String
+        if (text.front() == '"')
+            return parse_string(text);
+
+        // Inline table
+        if (text.front() == '{')
+        {
+            if (text.back() != '}')
+                throw parse_error("unterminated inline table");
+            return parse_inline_table(text.substr(1, text.size() - 2));
+        }
+
+        // Array
+        if (text.front() == '[')
+        {
+            if (text.back() != ']')
+                throw parse_error("unterminated array");
+            return parse_array(text.substr(1, text.size() - 2));
+        }
+
+        // Boolean
+        if (text == "true")
+            return toml{true};
+        if (text == "false")
+            return toml{false};
+
+        // Number detection
+        bool has_dot = false;
+        bool has_exp = false;
+        size_t start = (text[0] == '+' || text[0] == '-') ? 1 : 0;
+        for (size_t i = start; i < text.size(); ++i)
+        {
+            if (text[i] == '.')
+                has_dot = true;
+            if (text[i] == 'e' || text[i] == 'E')
+                has_exp = true;
+        }
+        try
+        {
+            if (has_dot || has_exp)
+            {
+                double d = std::stod(text);
+                return toml{d};
+            }
+            int64_t v = std::stoll(text);
+            return toml{v};
+        }
+        catch (...)
+        {
+            // Fallback: bare string
+            return toml{text};
+        }
+    }
+
+    void ensure_path(toml::table_t &root, const std::vector<std::string> &keys, size_t upto, toml::table_t **out)
+    {
+        toml::table_t *cur = &root;
+        for (size_t i = 0; i < upto; ++i)
+        {
+            auto &slot = (*cur)[keys[i]];
+            if (!slot.is_table())
+                slot = toml::table_t{};
+            cur = &slot.as_table();
+        }
+        *out = cur;
+    }
+}
+
+namespace mytoml
+{
+    MYTOML_VERSION_NAMESPACE_BEGIN
+
+    toml::toml() : m_value{nullptr} {}
+    toml::toml(table_t value) : m_value(std::move(value)) {}
+    toml::toml(array_t value) : m_value(std::move(value)) {}
+    toml::toml(std::string value) : m_value(std::move(value)) {}
+    toml::toml(const char *value) : m_value(std::string(value)) {}
+    toml::toml(int64_t value) : m_value(value) {}
+    toml::toml(double value) : m_value(value) {}
+    toml::toml(bool value) : m_value(value) {}
+
+    toml toml::parse(const std::string &text)
+    {
+        table_t root;
+        table_t *current = &root;
+
+        std::istringstream in(text);
+        std::string line;
+        while (std::getline(in, line))
+        {
+            auto trimmed = trim(line);
+            if (trimmed.empty())
+                continue;
+            if (trimmed[0] == '#')
+                continue;
+
+            if (trimmed.front() == '[' && trimmed.back() == ']')
+            {
+                // Table header
+                auto body = trimmed.substr(1, trimmed.size() - 2);
+                auto parts = split_top_level(body, '.');
+                ensure_path(root, parts, parts.size(), &current);
+                continue;
+            }
+
+            auto eq = trimmed.find('=');
+            if (eq == std::string::npos)
+                throw parse_error("expected '=' in assignment");
+
+            auto key_part = trim(trimmed.substr(0, eq));
+            auto value_part = trimmed.substr(eq + 1);
+            auto keys = split_top_level(key_part, '.');
+
+            table_t *target = nullptr;
+            if (keys.size() > 1)
+            {
+                ensure_path(*current, keys, keys.size() - 1, &target);
+            }
+            else
+            {
+                target = current;
+            }
+
+            auto key = keys.back();
+            (*target)[key] = parse_value(value_part);
+        }
+
+        return toml{root};
+    }
+
+    node_t toml::type() const noexcept
+    {
+        if (std::holds_alternative<table_t>(m_value))
+            return node_t::table;
+        if (std::holds_alternative<array_t>(m_value))
+            return node_t::array;
+        if (std::holds_alternative<std::string>(m_value))
+            return node_t::string;
+        if (std::holds_alternative<int64_t>(m_value))
+            return node_t::integer;
+        if (std::holds_alternative<double>(m_value))
+            return node_t::floating;
+        if (std::holds_alternative<bool>(m_value))
+            return node_t::boolean;
+        return node_t::unknown;
+    }
+
+    bool toml::is_table() const noexcept { return type() == node_t::table; }
+    bool toml::is_array() const noexcept { return type() == node_t::array; }
+    bool toml::is_string() const noexcept { return type() == node_t::string; }
+    bool toml::is_integer() const noexcept { return type() == node_t::integer; }
+    bool toml::is_floating() const noexcept { return type() == node_t::floating; }
+    bool toml::is_boolean() const noexcept { return type() == node_t::boolean; }
+
+    toml::table_t &toml::as_table() { return std::get<table_t>(m_value); }
+    const toml::table_t &toml::as_table() const { return std::get<table_t>(m_value); }
+    toml::array_t &toml::as_array() { return std::get<array_t>(m_value); }
+    const toml::array_t &toml::as_array() const { return std::get<array_t>(m_value); }
+    std::string &toml::as_string() { return std::get<std::string>(m_value); }
+    const std::string &toml::as_string() const { return std::get<std::string>(m_value); }
+    int64_t toml::as_integer() const { return std::get<int64_t>(m_value); }
+    double toml::as_floating() const
+    {
+        if (std::holds_alternative<double>(m_value))
+            return std::get<double>(m_value);
+        return static_cast<double>(std::get<int64_t>(m_value));
+    }
+    bool toml::as_boolean() const { return std::get<bool>(m_value); }
+
+    namespace
+    {
+        void dump_value(const toml &node, std::ostream &out);
+
+        void dump_table(const toml::table_t &table, const std::string &prefix, std::ostream &out)
+        {
+            if (!prefix.empty())
+            {
+                out << "[" << prefix << "]\n";
+            }
+
+            // Scalars first
+            for (const auto &kv : table)
+            {
+                if (kv.second.is_table())
+                    continue;
+                out << kv.first << " = ";
+                dump_value(kv.second, out);
+                out << "\n";
+            }
+            // Nested tables
+            for (const auto &kv : table)
+            {
+                if (!kv.second.is_table())
+                    continue;
+                std::string header = prefix.empty() ? kv.first : prefix + "." + kv.first;
+                dump_table(kv.second.as_table(), header, out);
+            }
+        }
+
+        void dump_value(const toml &node, std::ostream &out)
+        {
+            switch (node.type())
+            {
+            case node_t::string:
+                out << '"' << node.as_string() << '"';
+                break;
+            case node_t::integer:
+                out << node.as_integer();
+                break;
+            case node_t::floating:
+                out << node.as_floating();
+                break;
+            case node_t::boolean:
+                out << (node.as_boolean() ? "true" : "false");
+                break;
+            case node_t::array:
+            {
+                out << "[";
+                const auto &arr = node.as_array();
+                for (size_t i = 0; i < arr.size(); ++i)
+                {
+                    if (i)
+                        out << ", ";
+                    dump_value(arr[i], out);
+                }
+                out << "]";
+                break;
+            }
+            case node_t::table:
+            {
+                out << "{ ";
+                const auto &tbl = node.as_table();
+                size_t idx = 0;
+                for (const auto &kv : tbl)
+                {
+                    if (idx++)
+                        out << ", ";
+                    out << kv.first << " = ";
+                    dump_value(kv.second, out);
+                }
+                out << " }";
+                break;
+            }
+            default:
+                out << "null";
+                break;
+            }
+        }
+    }
+
+    std::string toml::dump(int /*indent*/) const
+    {
+        std::ostringstream out;
+        if (is_table())
+        {
+            dump_table(as_table(), "", out);
+        }
+        else
+        {
+            dump_value(*this, out);
+        }
+        return out.str();
+    }
+
+    const char *string(encoding type)
+    {
+        switch (type)
+        {
+        case encoding::utf8:
+            return "utf8";
+        case encoding::utf16:
+            return "utf16";
+        case encoding::utf16le:
+            return "utf16le";
+        case encoding::utf16be:
+            return "utf16be";
+        case encoding::utf32:
+            return "utf32";
+        case encoding::utf32le:
+            return "utf32le";
+        case encoding::utf32be:
+            return "utf32be";
+        default:
+            return "unspecified";
+        }
+    }
+
+    const char *string(node_t type)
+    {
+        switch (type)
+        {
+        case node_t::table:
+            return "table";
+        case node_t::array:
+            return "array";
+        case node_t::string:
+            return "string";
+        case node_t::integer:
+            return "integer";
+        case node_t::floating:
+            return "floating";
+        case node_t::boolean:
+            return "boolean";
+        default:
+            return "unknown";
+        }
+    }
+
+#ifndef MYTOML_NO_STL
+    std::ostream &operator<<(std::ostream &ostream, const encoding &type)
+    {
+        ostream << string(type);
+        return ostream;
+    }
+
+    std::ostream &operator<<(std::ostream &ostream, const node_t &type)
+    {
+        ostream << string(type);
+        return ostream;
+    }
+
+    std::ostream &operator<<(std::ostream &stream, const toml &node)
+    {
+        stream << node.dump();
+        return stream;
+    }
+
+    std::istream &operator>>(std::istream &stream, const toml &node)
+    {
+        std::ostringstream buffer;
+        buffer << stream.rdbuf();
+        const_cast<toml &>(node) = toml::parse(buffer.str());
+        return stream;
+    }
+#endif // MYTOML_NO_STL
+
+#ifndef MYTOML_NO_STL
+    toml literals::toml_literals::MYTOML_QUOTE_OPERATOR(const char *string, size_t size)
+    {
+        return toml::parse(std::string(string, size));
+    }
+
+#if MYTOML_HAS_CHAR8_T
+    toml literals::toml_literals::MYTOML_QUOTE_OPERATOR(const char8_t *string, size_t size)
+    {
+        return toml::parse(std::string(reinterpret_cast<const char *>(string), size));
+    }
+#endif // MYTOML_HAS_CHAR8_T
+
+    toml literals::toml_literals::MYTOML_QUOTE_OPERATOR(const char16_t *string, size_t size)
+    {
+        std::u16string u16(string, size);
+        std::string utf8;
+        utf8.reserve(u16.size());
+        for (char16_t c : u16)
+            utf8.push_back(static_cast<char>(c));
+        return toml::parse(utf8);
+    }
+
+    toml literals::toml_literals::MYTOML_QUOTE_OPERATOR(const char32_t *string, size_t size)
+    {
+        std::u32string u32(string, size);
+        std::string utf8;
+        utf8.reserve(u32.size());
+        for (char32_t c : u32)
+            utf8.push_back(static_cast<char>(c));
+        return toml::parse(utf8);
+    }
+#endif // MYTOML_NO_STL
+
+    MYTOML_VERSION_NAMESPACE_END
+} // namespace mytoml
 
 /**
  * CHANGELOG: Version history
