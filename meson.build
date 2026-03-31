@@ -14,8 +14,8 @@ project('mytoml',
 	default_options : [
 		'buildtype=release',
 		'default_library=static',
-		'cpp_std=' + get_option('mytoml_cpp_std')
-		]
+		],
+  	subproject_dir: 'tests/vendor'
 )
 
 compiler = meson.get_compiler('cpp')

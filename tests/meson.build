@@ -6,6 +6,12 @@
 if mytoml_build_tests
 	catch2_include_dirs = include_directories('vendor/Catch2/src')
 
+	catch2_dep = dependency(
+		'catch2-with-main',
+        fallback: ['Catch2', 'catch2_with_main_dep'],
+		required: true
+	)
+
     #===========================
     # C++ Library Tests        #
     #===========================
@@ -18,7 +24,7 @@ if mytoml_build_tests
 		'mytoml_cpp_tests', 
 		mytoml_test_sources,
 		include_directories: [mytoml_include_dirs, catch2_include_dirs],
-		dependencies: [mytoml_dep], 
+		dependencies: [mytoml_dep, catch2_dep], 
 		install: false
 	)
 
@@ -36,7 +42,7 @@ if mytoml_build_tests
 		'mytoml_c_tests', 
 		mytomlc_test_sources,
 		include_directories: [mytoml_include_dirs, catch2_include_dirs],
-		dependencies: [mytomlc_dep], 
+		dependencies: [mytomlc_dep, catch2_dep], 
 		install: false
 	)
 

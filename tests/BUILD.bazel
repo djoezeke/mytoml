@@ -11,7 +11,7 @@ load("@rules_cc//cc:defs.bzl", "cc_test")
 
 cc_test(
 	name = "mytoml_test",
-	srcs = ["cxx/Version.test.cpp"],
+	srcs = ["cxx/Main.test.cpp"],
 	deps = ["//:mytoml", "//tests/vendor/Catch2:catch2_main"],
 )
 

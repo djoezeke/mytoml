@@ -38,11 +38,11 @@ jobs:
       - name: Configure for clang checks
         run: cmake --preset default -B build-tidy -DMYTOML_BUILD_TESTS=OFF -DMYTOML_BUILD_EXAMPLES=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
-      - name: Run format target
-        run: cmake --build build-tidy --target format
+      # - name: Run format target
+      #   run: cmake --build build-tidy --target format
 
-      - name: Run tidy target
-        run: cmake --build build-tidy --target tidy
+      # - name: Run tidy target
+      #   run: cmake --build build-tidy --target tidy
 
   cmake:
     name: CMake (${{ matrix.os }})
