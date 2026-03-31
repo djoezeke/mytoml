@@ -28,7 +28,7 @@ file(GLOB_RECURSE FORMAT_FILES
     "${PROJECT_SOURCE_DIR}/src/*.cpp"
 )
 
-if(FORMAT_FILES STREQUAL "")
+if(NOT FORMAT_FILES)
     message(STATUS "No source files found for format check")
     return()
 endif()

@@ -1,6 +1,7 @@
 name: Issue
 description: Report an issue or unexpected behavior. 🙏
 title: "[Label] <section> : <title> "
+labels: [triage needed]
 
 body:
   - type: markdown
@@ -23,5 +24,51 @@ body:
         Please explain what you're seeing and what you would expect to see.
 
         Please provide as much detail as possible to make understanding and solving your problem as quick as possible. 🙏
+      placeholder: |
+        What happened?
+        What did you expect to happen?
     validations:
       required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Please provide clear and minimal steps to reproduce the issue.
+      placeholder: |
+        1. Configure/build with ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Errors
+      description: Paste any related console output, stack traces, or CI logs.
+      render: Shell
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      multiple: true
+      options:
+        - Linux
+        - macOS
+        - Windows
+    validations:
+      required: true
+
+  - type: input
+    id: compiler
+    attributes:
+      label: Compiler and Version
+      description: e.g. GCC 14.2, Clang 18, MSVC 19.40
+
+  - type: input
+    id: version
+    attributes:
+      label: Mytoml version / commit
+      description: e.g. v1.0.0 or a git commit hash

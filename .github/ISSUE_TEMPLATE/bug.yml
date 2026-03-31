@@ -29,6 +29,7 @@ body:
         Please provide an abstract description of the issue to the developers,
         and why you consider it to be a bug. Please include any specific links
         to the documentation, TOML specification, or code.
+      placeholder: Briefly describe the bug and why it is incorrect behavior.
     validations:
       required: true
   - type: textarea
@@ -38,6 +39,10 @@ body:
       description: >
         How do you trigger the bug? Please walk us through step by step. Be as
         specific as possible.
+      placeholder: |
+        1. Configure with ...
+        2. Build/run ...
+        3. Observe ...
     validations:
       required: true
   - type: textarea
@@ -47,6 +52,9 @@ body:
       description: >
         Please describe what you expected to happen after the steps above and
         what actually happened.
+      placeholder: |
+        Expected: ...
+        Actual: ...
     validations:
       required: true
   - type: textarea
@@ -77,9 +85,11 @@ body:
       multiple: true
       options:
         - Linux
-        - MacOs
+        - macOS
         - Windows
       default: 0
+    validations:
+      required: true
   - type: input
     id: compiler
     attributes:
@@ -118,4 +128,5 @@ body:
         Please check these additional steps:
       options:
         - label: The bug also occurs if the latest version from the [`main`](https://github.com/djoezeke/mytoml/tree/main) branch is used.
+          required: true
         - label: I can successfully [compile and run the unit tests](https://github.com/djoezeke/mytoml) without issues.

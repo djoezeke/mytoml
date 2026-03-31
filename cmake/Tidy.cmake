@@ -32,17 +32,16 @@ file(GLOB_RECURSE TIDY_FILES
     "${PROJECT_SOURCE_DIR}/src/*.cpp"
 )
 
-if(TIDY_FILES STREQUAL "")
+if(NOT TIDY_FILES)
     message(STATUS "No source files found for clang-tidy")
     return()
 endif()
 
-string(REPLACE "\\" "/" _include_dir_regex "${PROJECT_SOURCE_DIR}/include/.*")
 set(_tidy_failed OFF)
 
 foreach(_file IN LISTS TIDY_FILES)
     execute_process(
-        COMMAND "${CLANG_TIDY_BIN}" "${_file}" -p "${PROJECT_BINARY_DIR}" "--header-filter=^${_include_dir_regex}" -quiet
+        COMMAND "${CLANG_TIDY_BIN}" "${_file}" -p "${PROJECT_BINARY_DIR}" "--header-filter=.*" -quiet
         RESULT_VARIABLE _tidy_result
     )
 

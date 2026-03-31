@@ -110,10 +110,6 @@ jobs:
             exit 1
           fi
 
-          for f in "${RELEASE_FILES[@]}"; do
-            sha256sum "$f" > "$f.sha256"
-          done
-
           sha256sum "${RELEASE_FILES[@]}" > artifacts/SHA256SUMS.txt
 
       - name: Publish release assets
@@ -125,7 +121,5 @@ jobs:
           files: |
             artifacts/**/*.zip
             artifacts/**/*.tar.gz
-            artifacts/**/*.sha256
-            artifacts/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
