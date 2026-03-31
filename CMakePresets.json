@@ -33,11 +33,23 @@
       }
     },
     {
+      "name": "static",
+      "hidden": false,
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/default",
+      "description": "Release build with static libraries.",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_SHARED_LIBS": "OFF"
+      }
+    },
+
+    {
       "name": "shared",
       "hidden": false,
       "inherits": "base",
       "binaryDir": "${sourceDir}/build/shared",
-      "description": "Release build with shared libraries, examples, and tests enabled",
+      "description": "Release build with shared libraries",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "BUILD_SHARED_LIBS": "ON"

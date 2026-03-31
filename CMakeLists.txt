@@ -479,7 +479,7 @@ endif()
 # Package with CPack.
 #--------------------------------------------------------------------
 
-if(MYTOML_ENABLE_PACKINGK)
+if(MYTOML_ENABLE_PACKING)
 
     if(WIN32 AND NOT CYGWIN)
         find_program(ARGPARSER_MAKENSIS_EXECUTABLE makensis)

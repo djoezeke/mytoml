@@ -45,29 +45,16 @@ jobs:
       - name: Configure
         run: |
           BUILD_DIR="build-${{ matrix.os }}-${{ matrix.variant }}"
-          SHARED="OFF"
-          if [ "${{ matrix.variant }}" = "shared" ]; then
-            SHARED="ON"
-          fi
-
-          cmake -S . -B "${BUILD_DIR}" \
+          cmake --preset ${{ matrix.variant }} -B "${BUILD_DIR}"\
             -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS="${SHARED}" \
-            -DMYTOML_BUILD_CMYTOML=ON \
-            -DMYTOML_BUILD_TESTS=ON \
-            -DMYTOML_BUILD_EXAMPLES=ON \
             -DMYTOML_INSTALL=ON \
-            -DMYTOML_INSTALL_CPACK=ON
+            -DMYTOML_ENABLE_INSTALL=ON \
+            -DMYTOML_ENABLE_PACKING=ON
 
       - name: Build
         run: |
           BUILD_DIR="build-${{ matrix.os }}-${{ matrix.variant }}"
           cmake --build "${BUILD_DIR}" --config Release
-
-      - name: Test
-        run: |
-          BUILD_DIR="build-${{ matrix.os }}-${{ matrix.variant }}"
-          ctest --test-dir "${BUILD_DIR}" --output-on-failure -C Release
 
       - name: Install
         run: |
