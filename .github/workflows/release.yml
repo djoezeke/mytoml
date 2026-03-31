@@ -33,9 +33,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
 
       - name: Setup CMake
         uses: jwlawson/actions-setup-cmake@v2
@@ -45,7 +46,7 @@ jobs:
       - name: Configure
         run: |
           BUILD_DIR="build-${{ matrix.os }}-${{ matrix.variant }}"
-          cmake --preset ${{ matrix.variant }} -B "${BUILD_DIR}"\
+          cmake --preset ${{ matrix.variant }} -B "${BUILD_DIR}" \
             -DCMAKE_BUILD_TYPE=Release \
             -DMYTOML_INSTALL=ON \
             -DMYTOML_ENABLE_INSTALL=ON \
@@ -63,25 +64,30 @@ jobs:
           rm -rf "${INSTALL_DIR}"
           cmake --install "${BUILD_DIR}" --prefix "${PWD}/${INSTALL_DIR}"
 
-      - name: Create CPack archives
+      - name: Package archives
         run: |
           BUILD_DIR="build-${{ matrix.os }}-${{ matrix.variant }}"
-          cpack --config "${BUILD_DIR}/CPackConfig.cmake" -D CPACK_GENERATOR='ZIP;TGZ'
-
-      - name: Archive install tree
-        run: |
           INSTALL_DIR="install-${{ matrix.os }}-${{ matrix.variant }}"
+          DIST_DIR="dist/${{ matrix.os }}-${{ matrix.variant }}"
+          rm -rf "${DIST_DIR}"
+          mkdir -p "${DIST_DIR}"
+
+          cpack --config "${BUILD_DIR}/CPackConfig.cmake" \
+            -D CPACK_GENERATOR='ZIP;TGZ' \
+            -B "${PWD}/${DIST_DIR}"
+
           INSTALL_ARCHIVE="mytoml-${RELEASE_TAG}-${{ matrix.os }}-${{ matrix.variant }}-install.zip"
-          cmake -E tar cfv "${INSTALL_ARCHIVE}" --format=zip "${INSTALL_DIR}"
+          cmake -E tar cfv "${DIST_DIR}/${INSTALL_ARCHIVE}" --format=zip "${INSTALL_DIR}"
+
+          echo "Packaged files:"
+          find "${DIST_DIR}" -maxdepth 1 -type f \( -name '*.zip' -o -name '*.tar.gz' \) -print | sort
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.os }}-${{ matrix.variant }}
-          path: |
-            mytoml-${RELEASE_TAG}-${{ matrix.os }}-${{ matrix.variant }}-install.zip
-            build-${{ matrix.os }}-${{ matrix.variant }}/*.zip
-            build-${{ matrix.os }}-${{ matrix.variant }}/*.tar.gz
+          if-no-files-found: error
+          path: dist/${{ matrix.os }}-${{ matrix.variant }}/*
 
   publish:
     name: Publish GitHub Release
@@ -90,15 +96,25 @@ jobs:
 
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
+          pattern: release-*
+          merge-multiple: true
           path: artifacts
 
       - name: Generate checksums
         run: |
-          find artifacts -type f \( -name '*.zip' -o -name '*.tar.gz' \) -print0 | while IFS= read -r -d '' f; do
+          mapfile -t RELEASE_FILES < <(find artifacts -type f \( -name '*.zip' -o -name '*.tar.gz' \) | sort)
+          if [ "${#RELEASE_FILES[@]}" -eq 0 ]; then
+            echo "No release archives found in artifacts directory"
+            exit 1
+          fi
+
+          for f in "${RELEASE_FILES[@]}"; do
             sha256sum "$f" > "$f.sha256"
           done
+
+          sha256sum "${RELEASE_FILES[@]}" > artifacts/SHA256SUMS.txt
 
       - name: Publish release assets
         uses: softprops/action-gh-release@v2
@@ -110,5 +126,6 @@ jobs:
             artifacts/**/*.zip
             artifacts/**/*.tar.gz
             artifacts/**/*.sha256
+            artifacts/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
