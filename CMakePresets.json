@@ -65,6 +65,18 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "BUILD_SHARED_LIBS": "OFF"
       }
+    },
+    {
+      "name": "modules",
+      "hidden": false,
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/modules",
+      "description": "Release build with optional C++20 module target enabled when supported",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_SHARED_LIBS": "OFF",
+        "MYTOML_BUILD_MODULE": "ON"
+      }
     }
   ],
   "testPresets": [
@@ -85,6 +97,13 @@
     {
       "name": "develop",
       "configurePreset": "develop",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "modules",
+      "configurePreset": "modules",
       "output": {
         "outputOnFailure": true
       }

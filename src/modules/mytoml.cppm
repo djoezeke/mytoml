@@ -13,18 +13,20 @@ export module mytoml;
  * @namespace mytoml
  * @brief The mytoml namespace mytoml::
  */
-export namespace mytoml {
+export namespace mytoml
+{
 
-/**
- * @namespace literals
- * @brief The mytoml namespace mytoml::literals::
- */
-inline namespace literals {
+    /**
+     * @namespace literals
+     * @brief The mytoml namespace mytoml::literals::
+     */
+    namespace literals
+    {
 
-using ::mytoml::literals::operator""_toml;
+        using ::mytoml::literals::operator""_toml;
 
-}  // namespace literals
+    } // namespace literals
 
-using ::mytoml::toml;
+    using ::mytoml::toml;
 
-}  // namespace mytoml
+} // namespace mytoml

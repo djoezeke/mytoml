@@ -154,6 +154,7 @@ Please ensure your runtime environment meets the following requirements:
 
 - **C++11** or newer compiler
 - **CMake** (for building examples/tests)
+- Optional C++20 modules build requires **CMake 3.28+** and a modules-capable compiler (MSVC 19.34+ or Clang 16+).
 
 Mytoml uses following software, tools and services:
 
@@ -185,6 +186,16 @@ Mytoml uses following software, tools and services:
    ```sh
    g++ my_source.cpp mytoml.cpp -std=c++17 -o main
    ```
+
+To build the C++20 module target, configure CMake with `-DMYTOML_BUILD_MODULE=ON`.
+
+Module example (requires module-enabled build):
+
+```sh
+cmake --preset modules
+cmake --build build/modules --target ModuleExample
+./build/modules/examples/apis/ModuleExample
+```
 
 <!-- #### Using [CMake](https://cmake.org/)
 

@@ -79,6 +79,8 @@ include(CMakeDependentOption)
 
 mytoml_set_option(MYTOML_ENABLE_WARNING ${MYTOML_IS_TOP_LEVEL} BOOL "ON to enable warning messages.")
 
+mytoml_set_option(MYTOML_BUILD_MODULE OFF BOOL "ON to build the C++20 module target when supported by CMake/compiler")
+
 mytoml_set_option(MYTOML_BUILD_CMYTOML ON BOOL "ON to build MYTOMLC")
 
 # add an option for choosing the build type (shared or static)
@@ -137,6 +139,21 @@ else()
     set(CMAKE_CXX_STANDARD 17)
 endif()
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+
+set(MYTOML_MODULES_SUPPORTED OFF)
+if(MYTOML_BUILD_MODULE)
+    if(CMAKE_VERSION VERSION_LESS 3.28)
+        message(WARNING "MYTOML_BUILD_MODULE requires CMake 3.28 or newer. Module target will not be built.")
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.34)
+        set(MYTOML_MODULES_SUPPORTED ON)
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 16)
+        set(MYTOML_MODULES_SUPPORTED ON)
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        message(WARNING "MYTOML_BUILD_MODULE is ON, but GNU C++ modules support is currently not enabled due to unstable module artifact behavior in this project.")
+    else()
+        message(WARNING "MYTOML_BUILD_MODULE is ON, but the current compiler/version does not provide usable C++20 module support.")
+    endif()
+endif()
 
 if(DEFINED BUILD_SHARED_LIBS)
     # When defined, use BUILD_SHARED_LIBS as default
@@ -345,6 +362,10 @@ if(MYTOML_BUILD_CMYTOML)
     list(APPEND MYTOML_EXPORT_TARGETS mytomlc)
 endif()
 
+if(MYTOML_BUILD_MODULE AND MYTOML_MODULES_SUPPORTED)
+    add_subdirectory(src/modules)
+endif()
+
 #--------------------------------------------------------------------
 # Configurations
 #--------------------------------------------------------------------
@@ -442,6 +463,18 @@ if(MYTOML_ENABLE_INSTALL)
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         INCLUDES DESTINATION ${MYTOML_INCLUDE_INSTALL_DIR}
     )
+
+    if(TARGET mytoml-module)
+        install(
+            TARGETS mytoml-module
+            EXPORT ${MYTOML_CMAKE_TARGET_NAME}
+            FILE_SET modules DESTINATION ${CMAKE_INSTALL_LIBDIR}/mytoml/modules
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            INCLUDES DESTINATION ${MYTOML_INCLUDE_INSTALL_DIR}
+        )
+    endif()
 
     install(
         DIRECTORY ${MYTOML_INCLUDE_BUILD_DIR}
