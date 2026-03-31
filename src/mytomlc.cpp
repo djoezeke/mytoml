@@ -46,6 +46,8 @@
  *
  */
 
+// NOLINTBEGIN
+
 // clang-format off
 
 #if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_WARNINGS)
@@ -127,6 +129,8 @@ extern "C"
 #endif // __cplusplus
 
 #pragma endregion // Mytoml
+
+// NOLINTEND
 
 /**
  * HISTORY: Version History

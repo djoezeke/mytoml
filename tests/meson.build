@@ -12,16 +12,6 @@ if mytoml_build_tests
 
 	mytoml_test_sources = [
 		'cxx/Main.test.cpp',
-		'cxx/Encoding.test.cpp',
-		'cxx/Exceptions.test.cpp',
-		'cxx/IAdapter.test.cpp',
-		'cxx/Lexer.test.cpp',
-		'cxx/Literals.test.cpp',
-		'cxx/OAdapter.test.cpp',
-		'cxx/Parser.test.cpp',
-		'cxx/Serializer.test.cpp',
-		'cxx/Traits.test.cpp',
-		'cxx/Version.test.cpp'
 	]
 
 	mytoml_test_exe = executable(

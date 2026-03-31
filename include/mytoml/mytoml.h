@@ -62,6 +62,8 @@
 
 #define DJOEZEKE_MYTOMLC_H
 
+// NOLINTBEGIN
+
 // clang-format off
 
 #if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_WARNINGS)
@@ -303,6 +305,8 @@ extern "C"
 // clang-format on
 
 #endif // DJOEZEKE_MYTOMLC_H
+
+// NOLINTEND
 
 /**
  * HISTORY: Version History

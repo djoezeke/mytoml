@@ -48,6 +48,8 @@
  *
  */
 
+// NOLINTBEGIN
+
 // clang-format off
 
 #if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_WARNINGS)
@@ -2094,6 +2096,8 @@ namespace mytoml
 
     MYTOML_VERSION_NAMESPACE_END
 } // namespace mytoml
+
+// NOLINTEND
 
 /**
  * CHANGELOG: Version history

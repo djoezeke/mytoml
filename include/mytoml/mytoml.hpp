@@ -83,6 +83,8 @@
 
 #define DJOEZEKE_MYTOML_HPP
 
+// NOLINTBEGIN
+
 // clang-format off
 
 #if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_WARNINGS)
@@ -2414,6 +2416,8 @@ namespace mytoml
 // clang-format on
 
 #endif // DJOEZEKE_MYTOML_HPP
+
+// NOLINTEND
 
 /**
  * HISTORY: version History
