@@ -5,21 +5,12 @@
 
 cmake_minimum_required(VERSION 3.16...4.1.1 FATAL_ERROR)
 
-# TODO: Add UTF-8 encoding support for supported compilers.
-# TODO: Set compiler according C++11 support. include(CheckCXXCompilerFlag)
-# TODO: Set compiler according C11 support. include(CheckCCompilerFlag)
-# TODO: Use Cmake Dependent Option. include(CMakeDependentOption)
 # TODO: Enable Custom Compiler Warning Flags
 # TODO: Enable Address Sanitizers.
 # TODO: Run Clang-tidy and Clang-format.
 # TODO: Add C++ Modules Support (optional).
 # TODO: Add debug view definition file for msvc (natvis)
-# TODO: Use a custom package version config file instead
 # TODO: Execute test suite with Valgrind.
-
-# include(CheckLibraryExists)
-# include(CheckIncludeFile)
-# include(CheckLanguage)
 
 # define a macro that helps defining an option
 macro(mytoml_set_option var default type docstring)
@@ -55,9 +46,9 @@ project(Mytoml
 
 # Check if this project is the main project
 if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
-  set(MYTOML_IS_TOP_LEVEL ON)
+  set(MYTOML_IS_MAIN ON)
 else()
-  set(MYTOML_IS_TOP_LEVEL OFF)
+  set(MYTOML_IS_MAIN OFF)
 endif()
 
 # Add UTF-8 encoding support for MSVC compiler.
@@ -77,28 +68,28 @@ include(CMakeDependentOption)
 # Configure variables for the library   
 #--------------------------------------------------------------------
 
-mytoml_set_option(MYTOML_ENABLE_WARNING ${MYTOML_IS_TOP_LEVEL} BOOL "ON to enable warning messages.")
+mytoml_set_option(MYTOML_ENABLE_WARNING ${MYTOML_IS_MAIN} BOOL "ON to enable warning messages.")
 
 mytoml_set_option(MYTOML_BUILD_CMYTOML ON BOOL "ON to build MYTOMLC")
 
-# add an option for choosing the build type (shared or static)
+# an option for choosing the build type (shared or static)
 mytoml_set_option(MYTOML_BUILD_SHARED ON BOOL "ON to build MYTOML as shared libraries, OFF to build it as static libraries")
 
-# add an option for linking to mytoml either statically or dynamically
+# an option for linking to mytoml either statically or dynamically
 set(LINK_STATICALLY_DEFAULT ON)
 mytoml_set_option(CMYTOML_LINK_MYTOML_STATICALLY ${LINK_STATICALLY_DEFAULT} BOOL "ON to link to a static version of MYTOML, OFF to link dynamically")
 
-mytoml_set_option(MYTOML_INSTALL ${MYTOML_IS_TOP_LEVEL} BOOL "ON to Generate installation target" )
+mytoml_set_option(MYTOML_INSTALL ${MYTOML_IS_MAIN} BOOL "ON to Generate installation target" )
 mytoml_set_option(MYTOML_ENABLE_INSTALL ${MYTOML_INSTALL} BOOL "Enable installation.")
 mytoml_set_option(MYTOML_ENABLE_PACKING ${MYTOML_INSTALL} BOOL "Enable packing with CPack.")
 
-cmake_dependent_option(MYTOML_INSTALL_DOCS "Install docs for Mytoml" ${MYTOML_IS_TOP_LEVEL} "MYTOML_INSTALL" ON)
-cmake_dependent_option(MYTOML_INSTALL_TESTS "Install test-cases" ${MYTOML_IS_TOP_LEVEL} "MYTOML_INSTALL" ON)
-cmake_dependent_option(MYTOML_INSTALL_CPACK "Create binary Mytoml archive using CPack" ${MYTOML_IS_TOP_LEVEL} "MYTOML_INSTALL" ON)
+cmake_dependent_option(MYTOML_INSTALL_DOCS "Install docs for Mytoml" ${MYTOML_IS_MAIN} "MYTOML_INSTALL" ON)
+cmake_dependent_option(MYTOML_INSTALL_TESTS "Install test-cases" ${MYTOML_IS_MAIN} "MYTOML_INSTALL" ON)
+cmake_dependent_option(MYTOML_INSTALL_CPACK "Create binary Mytoml archive using CPack" ${MYTOML_IS_MAIN} "MYTOML_INSTALL" ON)
 
-# option(MYTOML_BUILD_SHARED "Build shared library" ${MYTOML_IS_TOP_LEVEL})
-# option(MYTOML_BUILD_DEBUG "Build debug version of library" ${MYTOML_IS_TOP_LEVEL})
-# option(MYTOML_ENABLE_DOXYGEN "Build documentation with Doxygen." ${MYTOML_IS_TOP_LEVEL})
+# option(MYTOML_BUILD_SHARED "Build shared library" ${MYTOML_IS_MAIN})
+# option(MYTOML_BUILD_DEBUG "Build debug version of library" ${MYTOML_IS_MAIN})
+# option(MYTOML_ENABLE_DOXYGEN "Build documentation with Doxygen." ${MYTOML_IS_MAIN})
 
 option(MYTOML_BUILD_C11 "Build Mytoml with C11" OFF)
 option(MYTOML_BUILD_C17 "Build Mytoml with C17" OFF)
@@ -239,7 +230,7 @@ macro(mytoml_make_library library)
     # set the target's folder (for IDEs that support it, e.g. Visual Studio)
     set_target_properties(${target} PROPERTIES FOLDER "Mytoml")
 
-    # add <project>/include as public include directory
+    # <project>/include as public include directory
     target_include_directories(${target} 
         PUBLIC $<BUILD_INTERFACE:${MYTOML_INCLUDE_BUILD_DIR}>
         PUBLIC $<INSTALL_INTERFACE:${MYTOML_INCLUDE_INSTALL_DIR}>
@@ -371,7 +362,7 @@ list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 # Add Project subdirectories
 #--------------------------------------------------------------------
 
-# add an option for building the API documentation
+# an option for building the API documentation
 mytoml_set_option(MYTOML_BUILD_DOCS OFF BOOL "ON to generate the API documentation, OFF to ignore it")
 
 # Build the documentation   
@@ -379,7 +370,7 @@ if(MYTOML_BUILD_DOCS)
     add_subdirectory(docs)
 endif()
 
-# add an option for building the examples
+# an option for building the examples
 mytoml_set_option(MYTOML_BUILD_EXAMPLES OFF BOOL "ON to build the CMYTOML examples, OFF to ignore them")
 
 # Build the example apps   
@@ -387,7 +378,7 @@ if(MYTOML_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
-# add an option for building the tests
+# an option for building the tests
 mytoml_set_option(MYTOML_BUILD_TESTS OFF BOOL "ON to build the CMYTOML test suite, OFF to ignore it")
 
 # Build the test apps   

@@ -44,7 +44,7 @@ include(Catch)
 # Ensure that Catch2 sources and headers are not analyzed by any tools
 set_target_properties(Catch2 PROPERTIES COMPILE_OPTIONS "" EXPORT_COMPILE_COMMANDS OFF UNITY_BUILD ON UNITY_BUILD_BATCH_SIZE 256)
 set_target_properties(Catch2WithMain PROPERTIES EXPORT_COMPILE_COMMANDS OFF)
-set_target_properties(Catch2 Catch2WithMain PROPERTIES FOLDER "Dependencies")
+# set_target_properties(Catch2 Catch2WithMain PROPERTIES FOLDER "Dependencies")
 get_target_property(CATCH2_INCLUDE_DIRS Catch2 INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(Catch2 SYSTEM INTERFACE ${CATCH2_INCLUDE_DIRS})
 
@@ -52,7 +52,7 @@ target_include_directories(Catch2 SYSTEM INTERFACE ${CATCH2_INCLUDE_DIRS})
 # Test Functions
 #--------------------------------------------------------------------
 
-# add a new target which is a MYTOML test
+# add a new target which is a test
 # example: mytoml_add_test(main-tests main.test.cpp ... Mytoml::Mytoml )
 function(mytoml_add_test target SOURCES DEPENDS)
 

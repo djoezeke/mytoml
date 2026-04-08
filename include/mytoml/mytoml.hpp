@@ -1509,7 +1509,7 @@ namespace mytoml
 
         /**
          * @class lexer
-         * @brief Lexical analyzer for JSON input.
+         * @brief Lexical Analyzer.
          *
          * The lexer reads bytes from an input adapter and produces tokens
          * consumed by the parser. It is a non-copyable, movable type.
@@ -2216,9 +2216,9 @@ namespace mytoml
 
     /**
      * @class mytoml::toml
-     * @brief Lightweight JSON value holder.
+     * @brief Lightweight value holder.
      *
-     * This is a placeholder for the public JSON value type. Public API and
+     * This is a placeholder for the public value type. Public API and
      * value accessors will be provided in the implementation file. The
      * internal representation is intentionally minimal in this header stub.
      */
