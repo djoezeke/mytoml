@@ -119,6 +119,133 @@ namespace mytoml
 
     namespace detail
     {
+#ifndef MYTOML_NO_EXCEPTIONS
+
+        //-----------------------------------------------------------------------------
+        // [SECTION] Mytoml : Exceptions
+        //-----------------------------------------------------------------------------
+        // - exception()
+        // - what()
+        // - parse_error()
+        // - generate()
+        // - encoding_error()
+        // - generate()
+        //-----------------------------------------------------------------------------
+
+        exception::exception(const char *message) noexcept
+        {
+            if (message != nullptr)
+            {
+                m_Message.append(message);
+            }
+        };
+
+        const char *exception::what() const noexcept { return m_Message.c_str(); };
+
+        parse_error::parse_error(const char *message) noexcept
+            : exception(generate(message, {})) {};
+
+        parse_error::parse_error(const char *message, detail::mark mark) noexcept
+            : exception(generate(message, mark)) {};
+
+        const char *parse_error::generate(const char *message, detail::mark mark) noexcept
+        {
+            // Use a thread_local buffer so the returned pointer remains valid
+            // until the next call on the same thread. Callers should copy the
+            // string if they need to keep it longer.
+            thread_local std::string buffer;
+            buffer.clear();
+
+            if (message != nullptr)
+            {
+                buffer.append(message);
+            }
+
+            // Append positional information if available
+            char tmp[128];
+            int n = snprintf(tmp, sizeof(tmp), " (line: %zu, column: %zu, index: %zu)", mark.line, mark.column, mark.index);
+            if (n > 0)
+            {
+                buffer.append(tmp, static_cast<size_t>(n));
+            }
+
+            // Ensure null-termination and return pointer
+            return buffer.c_str();
+        };
+
+        encoding_error::encoding_error(const char *message) noexcept
+            : exception(generate(encoding::unspecified, message, nullptr, 0)) {};
+
+        encoding_error::encoding_error(encoding encoding, const char *message, void *data, size_t size) noexcept
+            : exception(generate(encoding, message, data, size)) {};
+
+        const char *encoding_error::generate(encoding enc, const char *message, void *data, size_t size) noexcept
+        {
+            thread_local std::string buffer;
+            buffer.clear();
+
+            if (message != nullptr)
+            {
+                buffer.append(message);
+            }
+
+            // Append encoding name
+            const char *enc_name = "unspecified";
+            switch (enc)
+            {
+            case encoding::utf8:
+                enc_name = "utf-8";
+                break;
+            case encoding::utf16:
+            case encoding::utf16le:
+                enc_name = "utf-16-le";
+                break;
+            case encoding::utf16be:
+                enc_name = "utf-16-be";
+                break;
+            case encoding::utf32:
+            case encoding::utf32le:
+                enc_name = "utf-32-le";
+                break;
+            case encoding::utf32be:
+                enc_name = "utf-32-be";
+                break;
+            default:
+                break;
+            }
+
+            char tmp[128];
+            int n = snprintf(tmp, sizeof(tmp), " [encoding: %s]", enc_name);
+            if (n > 0)
+            {
+                buffer.append(tmp, static_cast<size_t>(n));
+            }
+
+            // If data is provided, append a short hex preview (up to 8 bytes)
+            if (data != nullptr && size > 0)
+            {
+                const unsigned char *b = reinterpret_cast<const unsigned char *>(data);
+                size_t preview = (size < 8) ? size : 8; // limit
+                buffer.append(" [data: 0x");
+                for (size_t i = 0; i < preview; ++i)
+                {
+                    int written = snprintf(tmp, sizeof(tmp), "%02x", b[i]);
+                    if (written > 0)
+                    {
+                        buffer.append(tmp, static_cast<size_t>(written));
+                    }
+                }
+                if (size > preview)
+                {
+                    buffer.append("...");
+                }
+                buffer.append("]");
+            }
+
+            return buffer.c_str();
+        };
+
+#endif // MYTOML_NO_EXCEPTIONS
 
         //-------------------------------------------------------------------------
         // [SECTION] Details : Encoding
@@ -281,7 +408,7 @@ namespace mytoml
             return -1;
         };
 
-        std::vector<unsigned char> utf8::to_utf16(const std::string &string, endian order)
+        std::vector<unsigned char> utf8::to_utf16(const std::string &string, mytoml_endian_value_t order)
         {
             std::vector<unsigned char> out;
             size_t idx = 0;
@@ -300,7 +427,7 @@ namespace mytoml
             return out;
         };
 
-        std::vector<unsigned char> utf8::to_utf32(const std::string &string, endian order)
+        std::vector<unsigned char> utf8::to_utf32(const std::string &string, mytoml_endian_value_t order)
         {
             std::vector<unsigned char> out;
             size_t idx = 0;
@@ -347,7 +474,7 @@ namespace mytoml
          *
          */
 
-        int utf16::decode(const char *data, size_t size, unsigned int &value, endian order)
+        int utf16::decode(const char *data, size_t size, unsigned int &value, mytoml_endian_value_t order)
         {
             if (size < 2 || data == nullptr)
             {
@@ -359,13 +486,13 @@ namespace mytoml
 
             auto read_u16 = [&](size_t offset) -> uint16_t
             {
-                if (order == endian::native)
+                if (order == mytoml_endian_t::native)
                 {
                     uint16_t tmp = 0;
                     memcpy(&tmp, b + offset, 2);
                     return tmp;
                 }
-                else if (order == endian::little)
+                else if (order == mytoml_endian_t::little)
                 {
                     return static_cast<uint16_t>(b[offset] | (b[offset + 1] << 8));
                 }
@@ -401,7 +528,7 @@ namespace mytoml
             return 2;
         };
 
-        int utf16::encode(unsigned int codepoint, utf16::char_t *output, size_t size, endian order)
+        int utf16::encode(unsigned int codepoint, utf16::char_t *output, size_t size, mytoml_endian_value_t order)
         {
             if (size < 2 || output == nullptr)
             {
@@ -412,11 +539,11 @@ namespace mytoml
 
             auto write_u16 = [&](size_t offset, uint16_t val)
             {
-                if (order == endian::native)
+                if (order == mytoml_endian_t::native)
                 {
                     memcpy(out + offset, &val, 2);
                 }
-                else if (order == endian::little)
+                else if (order == mytoml_endian_t::little)
                 {
                     out[offset] = static_cast<unsigned char>(val & 0xFF);
                     out[offset + 1] = static_cast<unsigned char>((val >> 8) & 0xFF);
@@ -453,7 +580,7 @@ namespace mytoml
             return 2;
         };
 
-        std::string utf16::to_utf8(const std::vector<unsigned char> &bytes, endian order)
+        std::string utf16::to_utf8(const std::vector<unsigned char> &bytes, mytoml_endian_value_t order)
         {
             std::string out;
             size_t idx = 0;
@@ -471,7 +598,7 @@ namespace mytoml
             return out;
         };
 
-        int utf32::decode(const char *data, size_t size, unsigned int &value, endian order)
+        int utf32::decode(const char *data, size_t size, unsigned int &value, mytoml_endian_value_t order)
         {
             if (size < 4 || data == nullptr)
             {
@@ -482,11 +609,11 @@ namespace mytoml
             const unsigned char *b = reinterpret_cast<const unsigned char *>(data);
             uint32_t tmp = 0;
 
-            if (order == endian::native)
+            if (order == mytoml_endian_t::native)
             {
                 memcpy(&tmp, b, 4);
             }
-            else if (order == endian::little)
+            else if (order == mytoml_endian_t::little)
             {
                 tmp = (uint32_t)b[0] | ((uint32_t)b[1] << 8) | ((uint32_t)b[2] << 16) | ((uint32_t)b[3] << 24);
             }
@@ -499,7 +626,7 @@ namespace mytoml
             return 4;
         };
 
-        int utf32::encode(unsigned int codepoint, utf32::char_t *output, size_t size, endian order)
+        int utf32::encode(unsigned int codepoint, utf32::char_t *output, size_t size, mytoml_endian_value_t order)
         {
             if (size < 4 || output == nullptr)
             {
@@ -509,11 +636,11 @@ namespace mytoml
             uint32_t cp = static_cast<uint32_t>(codepoint);
             unsigned char *out = reinterpret_cast<unsigned char *>(output);
 
-            if (order == endian::native)
+            if (order == mytoml_endian_t::native)
             {
                 memcpy(out, &cp, 4);
             }
-            else if (order == endian::little)
+            else if (order == mytoml_endian_t::little)
             {
                 out[0] = static_cast<unsigned char>(cp & 0xFF);
                 out[1] = static_cast<unsigned char>((cp >> 8) & 0xFF);
@@ -531,7 +658,7 @@ namespace mytoml
             return 1;
         };
 
-        std::string utf32::to_utf8(const std::vector<unsigned char> &bytes, endian order)
+        std::string utf32::to_utf8(const std::vector<unsigned char> &bytes, mytoml_endian_value_t order)
         {
             std::string out;
             size_t idx = 0;
@@ -548,6 +675,433 @@ namespace mytoml
             }
             return out;
         };
+
+        //-------------------------------------------------------------------------
+        // [SECTION] Details : Iterators
+        //-------------------------------------------------------------------------
+
+        //-----------------------------------------------------------------------------
+        // [Class] iterator
+        //-----------------------------------------------------------------------------
+        //-----------------------------------------------------------------------------
+
+        template <class node_type>
+        iterator<node_type>::iterator(pointer toml) noexcept
+            : m_table(toml)
+        {
+            if (m_table != nullptr && m_table->is_array())
+            {
+                m_type = iterator_t::array;
+            }
+            else
+            {
+                m_type = iterator_t::table;
+            }
+        }
+
+        template <class node_type>
+        template <typename T, typename std::enable_if<std::is_const<T>::value, int>::type>
+        iterator<node_type>::iterator(const other_iterator &other) noexcept
+            : m_table(other.m_table)
+        {
+            if (other.type() == other_iterator::iterator_t::array)
+            {
+                m_type = iterator_t::array;
+                m_holder.array_iter = other.m_holder.array_iter;
+            }
+            else
+            {
+                m_type = iterator_t::table;
+                m_holder.table_iter = other.m_holder.table_iter;
+            }
+        }
+
+        template <class node_type>
+        iterator<node_type>::iterator(const table_iterator &itr) noexcept
+            : m_type(iterator_t::table)
+        {
+            m_holder.table_iter = itr;
+        }
+
+        template <class node_type>
+        iterator<node_type>::iterator(const array_iterator &itr) noexcept
+            : m_type(iterator_t::array)
+        {
+            m_holder.array_iter = itr;
+        }
+
+        template <class node_type>
+        typename iterator<node_type>::iterator_t iterator<node_type>::type() const noexcept
+        {
+            return m_type;
+        }
+
+        template <class node_type>
+        const std::string &iterator<node_type>::key() const
+        {
+            if (m_type != iterator_t::table)
+            {
+                MYTOML_THROW(std::runtime_error("Cannot retrieve key from non-table iterator"));
+            }
+            return m_holder.table_iter->first;
+        }
+
+        template <class node_type>
+        typename iterator<node_type>::reference iterator<node_type>::value() const noexcept
+        {
+            return operator*();
+        }
+
+        template <class node_type>
+        bool iterator<node_type>::operator==(const mytoml::detail::iterator<node_type> &rhs) const
+        {
+            if (m_type != rhs.m_type)
+            {
+                return false;
+            }
+
+            if (m_type == iterator_t::array)
+            {
+                return m_holder.array_iter == rhs.m_holder.array_iter;
+            }
+
+            return m_holder.table_iter == rhs.m_holder.table_iter;
+        }
+
+        template <class node_type>
+        bool iterator<node_type>::operator==(const typename iterator<node_type>::other_iterator &rhs) const
+        {
+            if (static_cast<unsigned int>(m_type) != static_cast<unsigned int>(rhs.type()))
+            {
+                return false;
+            }
+
+            if (m_type == iterator_t::array)
+            {
+                return m_holder.array_iter == rhs.m_holder.array_iter;
+            }
+
+            return m_holder.table_iter == rhs.m_holder.table_iter;
+        }
+
+        template <class node_type>
+        bool iterator<node_type>::operator!=(const mytoml::detail::iterator<node_type> &rhs) const
+        {
+            return !(*this == rhs);
+        }
+
+        template <class node_type>
+        bool iterator<node_type>::operator!=(const typename iterator<node_type>::other_iterator &rhs) const
+        {
+            return !(*this == rhs);
+        }
+
+        template <class node_type>
+        bool iterator<node_type>::operator<(const mytoml::detail::iterator<node_type> &rhs) const
+        {
+            if (m_type != rhs.m_type)
+            {
+                return static_cast<unsigned int>(m_type) < static_cast<unsigned int>(rhs.m_type);
+            }
+
+            if (m_type == iterator_t::array)
+            {
+                return m_holder.array_iter < rhs.m_holder.array_iter;
+            }
+
+            return false;
+        }
+
+        template <class node_type>
+        bool iterator<node_type>::operator<(const typename iterator<node_type>::other_iterator &rhs) const
+        {
+            const auto lhs_type = static_cast<unsigned int>(m_type);
+            const auto rhs_type = static_cast<unsigned int>(rhs.type());
+            if (lhs_type != rhs_type)
+            {
+                return lhs_type < rhs_type;
+            }
+
+            if (m_type == iterator_t::array)
+            {
+                return m_holder.array_iter < rhs.m_holder.array_iter;
+            }
+
+            return false;
+        }
+
+        template <class node_type>
+        bool iterator<node_type>::operator<=(const mytoml::detail::iterator<node_type> &rhs) const
+        {
+            return (*this < rhs) || (*this == rhs);
+        }
+
+        template <class node_type>
+        bool iterator<node_type>::operator<=(const typename iterator<node_type>::other_iterator &rhs) const
+        {
+            return (*this < rhs) || (*this == rhs);
+        }
+
+        template <class node_type>
+        bool iterator<node_type>::operator>(const mytoml::detail::iterator<node_type> &rhs) const
+        {
+            return rhs < *this;
+        }
+
+        template <class node_type>
+        bool iterator<node_type>::operator>(const typename iterator<node_type>::other_iterator &rhs) const
+        {
+            return rhs < *this;
+        }
+
+        template <class node_type>
+        bool iterator<node_type>::operator>=(const mytoml::detail::iterator<node_type> &rhs) const
+        {
+            return !(*this < rhs);
+        }
+
+        template <class node_type>
+        bool iterator<node_type>::operator>=(const typename iterator<node_type>::other_iterator &rhs) const
+        {
+            return !(*this < rhs);
+        }
+
+        template <class node_type>
+        typename iterator<node_type>::pointer iterator<node_type>::operator->() noexcept
+        {
+            if (m_type == iterator_t::array)
+            {
+                return &(*m_holder.array_iter);
+            }
+            return &m_holder.table_iter->second;
+        }
+
+        template <class node_type>
+        typename iterator<node_type>::reference iterator<node_type>::operator*() const noexcept
+        {
+            if (m_type == iterator_t::array)
+            {
+                return *m_holder.array_iter;
+            }
+            return m_holder.table_iter->second;
+        }
+
+        template <class node_type>
+        iterator<node_type> iterator<node_type>::operator+(difference_type i) const noexcept
+        {
+            iterator result(*this);
+            result += i;
+            return result;
+        }
+
+        template <class node_type>
+        iterator<node_type> &iterator<node_type>::operator+=(difference_type i) noexcept
+        {
+            if (i >= 0)
+            {
+                while (i-- > 0)
+                {
+                    ++(*this);
+                }
+            }
+            else
+            {
+                while (i++ < 0)
+                {
+                    --(*this);
+                }
+            }
+            return *this;
+        }
+
+        template <class node_type>
+        iterator<node_type> &iterator<node_type>::operator++() noexcept
+        {
+            if (m_type == iterator_t::array)
+            {
+                ++m_holder.array_iter;
+            }
+            else
+            {
+                ++m_holder.table_iter;
+            }
+            return *this;
+        }
+
+        template <class node_type>
+        iterator<node_type> iterator<node_type>::operator++(int) & noexcept
+        {
+            iterator result(*this);
+            ++(*this);
+            return result;
+        }
+
+        template <class node_type>
+        iterator<node_type> iterator<node_type>::operator-(difference_type i) const noexcept
+        {
+            iterator result(*this);
+            result -= i;
+            return result;
+        }
+
+        template <class node_type>
+        iterator<node_type> &iterator<node_type>::operator-=(difference_type i) noexcept
+        {
+            return (*this += -i);
+        }
+
+        template <class node_type>
+        iterator<node_type> &iterator<node_type>::operator--() noexcept
+        {
+            if (m_type == iterator_t::array)
+            {
+                --m_holder.array_iter;
+            }
+            else
+            {
+                --m_holder.table_iter;
+            }
+            return *this;
+        }
+
+        template <class node_type>
+        iterator<node_type> iterator<node_type>::operator--(int) & noexcept
+        {
+            iterator result(*this);
+            --(*this);
+            return result;
+        }
+
+        //-----------------------------------------------------------------------------
+        // [Class] reverse_iterator
+        //-----------------------------------------------------------------------------
+        //-----------------------------------------------------------------------------
+
+        template <class iterator_type>
+        reverse_iterator<iterator_type>::reverse_iterator(const iterator_type &iter) noexcept
+            : base_iterator(iter)
+        {
+        }
+
+        template <class iterator_type>
+        reverse_iterator<iterator_type>::reverse_iterator(const base_iterator &iter) noexcept
+            : base_iterator(iter)
+        {
+        }
+
+        template <class iterator_type>
+        const std::string &reverse_iterator<iterator_type>::key() const
+        {
+            auto it = this->base();
+            --it;
+            return it.key();
+        }
+
+        template <class iterator_type>
+        typename reverse_iterator<iterator_type>::reference reverse_iterator<iterator_type>::value() const noexcept
+        {
+            auto it = this->base();
+            --it;
+            return *it;
+        }
+
+        template <class iterator_type>
+        typename reverse_iterator<iterator_type>::reference reverse_iterator<iterator_type>::operator[](difference_type i) const
+        {
+            return *(*this + i);
+        }
+
+        template <class iterator_type>
+        reverse_iterator<iterator_type> reverse_iterator<iterator_type>::operator+(difference_type i) const noexcept
+        {
+            reverse_iterator result(*this);
+            result += i;
+            return result;
+        }
+
+        template <class iterator_type>
+        reverse_iterator<iterator_type> &reverse_iterator<iterator_type>::operator+=(difference_type i) noexcept
+        {
+            if (i >= 0)
+            {
+                while (i-- > 0)
+                {
+                    ++(*this);
+                }
+            }
+            else
+            {
+                while (i++ < 0)
+                {
+                    --(*this);
+                }
+            }
+            return *this;
+        }
+
+        template <class iterator_type>
+        reverse_iterator<iterator_type> &reverse_iterator<iterator_type>::operator++() noexcept
+        {
+            base_iterator::operator++();
+            return *this;
+        }
+
+        template <class iterator_type>
+        reverse_iterator<iterator_type> reverse_iterator<iterator_type>::operator++(int) & noexcept
+        {
+            reverse_iterator result(*this);
+            ++(*this);
+            return result;
+        }
+
+        template <class iterator_type>
+        reverse_iterator<iterator_type> reverse_iterator<iterator_type>::operator-(difference_type i) const noexcept
+        {
+            reverse_iterator result(*this);
+            result -= i;
+            return result;
+        }
+
+        template <class iterator_type>
+        typename reverse_iterator<iterator_type>::difference_type reverse_iterator<iterator_type>::operator-(const reverse_iterator &other) const
+        {
+            difference_type distance = 0;
+            auto it = other;
+
+            while (it != *this)
+            {
+                ++it;
+                ++distance;
+            }
+
+            return distance;
+        }
+
+        template <class iterator_type>
+        reverse_iterator<iterator_type> &reverse_iterator<iterator_type>::operator-=(difference_type i) noexcept
+        {
+            return (*this += -i);
+        }
+
+        template <class iterator_type>
+        reverse_iterator<iterator_type> &reverse_iterator<iterator_type>::operator--() noexcept
+        {
+            base_iterator::operator--();
+            return *this;
+        }
+
+        template <class iterator_type>
+        reverse_iterator<iterator_type> reverse_iterator<iterator_type>::operator--(int) & noexcept
+        {
+            reverse_iterator result(*this);
+            --(*this);
+            return result;
+        }
+
+        template class iterator<toml>;
+        template class iterator<const toml>;
+        template class reverse_iterator<iterator<toml>>;
+        template class reverse_iterator<iterator<const toml>>;
 
         //-------------------------------------------------------------------------
         // [SECTION] Details : Input
@@ -749,7 +1303,7 @@ namespace mytoml
 
         void lexer::advance(size_t amount)
         {
-            int times = 1;
+            size_t times = 1;
             do
             {
                 m_position.index += 1;
@@ -770,7 +1324,7 @@ namespace mytoml
 
         void lexer::reverse(size_t amount)
         {
-            int times = 1;
+            size_t times = 1;
             do
             {
                 m_position.index -= 1;
@@ -1414,396 +1968,649 @@ namespace mytoml
 #endif // MYTOML_NO_STL
 
     //-----------------------------------------------------------------------------
-    // [SECTION] Mytoml : Functions
-    //-----------------------------------------------------------------------------
-    // - operator<<()
-    // - operator>>()
+    // [Class] toml
     //-----------------------------------------------------------------------------
 
-    // Implementations for these APIs are provided in the consolidated section
-    // later in this translation unit.
+    //========== Constructors ==========
 
-#ifndef MYTOML_NO_EXCEPTIONS
-
-    //-----------------------------------------------------------------------------
-    // [SECTION] Mytoml : Exceptions
-    //-----------------------------------------------------------------------------
-    // - exception()
-    // - what()
-    // - parse_error()
-    // - generate()
-    // - encoding_error()
-    // - generate()
-    //-----------------------------------------------------------------------------
-
-    exception::exception(const char *message) noexcept
+    toml::toml() noexcept
+        : m_value(nullptr)
     {
-        if (message != nullptr)
-        {
-            m_Message.append(message);
-        }
-    };
+    }
 
-    const char *exception::what() const noexcept { return m_Message.c_str(); };
-
-    parse_error::parse_error(const char *message) noexcept
-        : exception(generate(message, {})) {};
-
-    parse_error::parse_error(const char *message, detail::mark mark) noexcept
-        : exception(generate(message, mark)) {};
-
-    const char *parse_error::generate(const char *message, detail::mark mark) noexcept
+    toml::toml(std::nullptr_t) noexcept
+        : m_value(nullptr)
     {
-        // Use a thread_local buffer so the returned pointer remains valid
-        // until the next call on the same thread. Callers should copy the
-        // string if they need to keep it longer.
-        thread_local std::string buffer;
-        buffer.clear();
+    }
 
-        if (message != nullptr)
-        {
-            buffer.append(message);
-        }
-
-        // Append positional information if available
-        char tmp[128];
-        int n = snprintf(tmp, sizeof(tmp), " (line: %zu, column: %zu, index: %zu)", mark.line, mark.column, mark.index);
-        if (n > 0)
-        {
-            buffer.append(tmp, static_cast<size_t>(n));
-        }
-
-        // Ensure null-termination and return pointer
-        return buffer.c_str();
-    };
-
-    encoding_error::encoding_error(const char *message) noexcept
-        : exception(generate(encoding::unspecified, message, nullptr, 0)) {};
-
-    encoding_error::encoding_error(encoding encoding, const char *message, void *data, size_t size) noexcept
-        : exception(generate(encoding, message, data, size)) {};
-
-    const char *encoding_error::generate(encoding enc, const char *message, void *data, size_t size) noexcept
+    toml::toml(bool value) noexcept
+        : m_value(value)
     {
-        thread_local std::string buffer;
-        buffer.clear();
+    }
 
-        if (message != nullptr)
+    toml::toml(int value) noexcept
+        : m_value(static_cast<integer_t>(value))
+    {
+    }
+
+    toml::toml(value_t value) noexcept
+    {
+        switch (value)
         {
-            buffer.append(message);
+        case value_t::null:
+            m_value = nullptr;
+            break;
+        case value_t::boolean:
+            m_value = false;
+            break;
+        case value_t::integer:
+            m_value = static_cast<integer_t>(0);
+            break;
+        case value_t::number:
+            m_value = static_cast<number_t>(0.0);
+            break;
+        case value_t::string:
+            m_value = string_t();
+            break;
+        case value_t::array:
+            m_value = array_t();
+            break;
+        case value_t::table:
+            m_value = table_t();
+            break;
+        }
+    }
+
+    toml::toml(integer_t value) noexcept
+        : m_value(value)
+    {
+    }
+
+    toml::toml(number_t value) noexcept
+        : m_value(value)
+    {
+    }
+
+    toml::toml(const char *value)
+        : m_value(string_t(value != nullptr ? value : ""))
+    {
+    }
+
+    toml::toml(const string_t &value)
+        : m_value(value)
+    {
+    }
+
+    toml::toml(const string_t &&value)
+        : m_value(std::move(value))
+    {
+    }
+
+    toml::toml(const array_t &value)
+        : m_value(value)
+    {
+    }
+
+    toml::toml(const array_t &&value)
+        : m_value(std::move(value))
+    {
+    }
+
+    toml::toml(const table_t &value)
+        : m_value(value)
+    {
+    }
+
+    toml::toml(const table_t &&value)
+        : m_value(std::move(value))
+    {
+    }
+
+    toml::toml(toml::initializer_list_t init, bool type_deduction, toml::value_t manual_type)
+    {
+        bool as_table = (manual_type == value_t::table);
+        if (manual_type != value_t::array && manual_type != value_t::table)
+        {
+            as_table = false;
         }
 
-        // Append encoding name
-        const char *enc_name = "unspecified";
-        switch (enc)
+        if (type_deduction && !as_table)
         {
-        case encoding::utf8:
-            enc_name = "utf-8";
-            break;
-        case encoding::utf16:
-        case encoding::utf16le:
-            enc_name = "utf-16-le";
-            break;
-        case encoding::utf16be:
-            enc_name = "utf-16-be";
-            break;
-        case encoding::utf32:
-        case encoding::utf32le:
-            enc_name = "utf-32-le";
-            break;
-        case encoding::utf32be:
-            enc_name = "utf-32-be";
-            break;
+            as_table = true;
+            for (const auto &element : init)
+            {
+                if (!element.is_array() || element.size() != 2 || !element[static_cast<size_t>(0)].is_string())
+                {
+                    as_table = false;
+                    break;
+                }
+            }
+        }
+
+        if (as_table)
+        {
+            table_t object;
+            for (const auto &element : init)
+            {
+                object[element[static_cast<size_t>(0)].as_string()] = element[static_cast<size_t>(1)];
+            }
+            m_value = std::move(object);
+            return;
+        }
+
+        array_t array;
+        array.reserve(init.size());
+        for (const auto &element : init)
+        {
+            array.push_back(element);
+        }
+        m_value = std::move(array);
+    }
+
+    toml::toml(const toml &other) = default;
+    toml::toml(toml &&other) noexcept = default;
+
+    toml toml::table(initializer_list_t init)
+    {
+        return toml(init, false, value_t::table);
+    }
+
+    toml toml::array(initializer_list_t init)
+    {
+        return toml(init, false, value_t::array);
+    }
+
+    //========== Helper Methods ==========
+
+    void toml::ensure_table()
+    {
+        if (!is_table())
+            m_value = table_t();
+    }
+
+    void toml::ensure_array()
+    {
+        if (!is_array())
+            m_value = array_t();
+    }
+
+    const toml::table_t &toml::get_table() const
+    {
+        if (!is_table())
+            MYTOML_THROW(std::runtime_error("Cannot access as object"));
+        return std::get<table_t>(m_value);
+    }
+
+    const toml::array_t &toml::get_array() const
+    {
+        if (!is_array())
+            MYTOML_THROW(std::runtime_error("Cannot access as array"));
+        return std::get<array_t>(m_value);
+    }
+
+    toml::table_t &toml::get_table()
+    {
+        if (!is_table())
+            MYTOML_THROW(std::runtime_error("Cannot access as object"));
+        return std::get<table_t>(m_value);
+    }
+
+    toml::array_t &toml::get_array()
+    {
+        if (!is_array())
+            MYTOML_THROW(std::runtime_error("Cannot access as array"));
+        return std::get<array_t>(m_value);
+    }
+
+    //========== Container Access (Objects) ==========
+
+    toml &toml::at(const std::string &key) { return get_table().at(key); }
+    const toml &toml::at(const std::string &key) const { return get_table().at(key); }
+
+    toml &toml::operator[](const std::string &key)
+    {
+        ensure_table();
+        return get_table()[key];
+    }
+
+    toml toml::operator[](const std::string &key) const
+    {
+        if (!is_table())
+            return toml();
+        auto &obj = get_table();
+        auto it = obj.find(key);
+        return it != obj.end() ? it->second : toml();
+    }
+
+    toml &toml::operator[](const char *key) { return operator[](std::string(key)); }
+    toml toml::operator[](const char *key) const { return operator[](std::string(key)); }
+
+    bool toml::contains(const std::string &key) const noexcept
+    {
+        if (!is_table())
+            return false;
+        return get_table().find(key) != get_table().end();
+    }
+
+    size_t toml::count(const std::string &key) const noexcept
+    {
+        if (!is_table())
+            return 0;
+        return get_table().count(key);
+    }
+
+    size_t toml::erase(const std::string &key) noexcept
+    {
+        if (!is_table())
+            return 0;
+        return get_table().erase(key);
+    }
+
+    //========== Container Access (Arrays) ==========
+
+    toml &toml::at(size_t index) { return get_array().at(index); }
+    const toml &toml::at(size_t index) const { return get_array().at(index); }
+
+    toml &toml::operator[](size_t index)
+    {
+        ensure_array();
+        auto &arr = get_array();
+        if (index >= arr.size())
+            arr.resize(index + 1);
+        return arr[index];
+    }
+
+    const toml &toml::operator[](size_t index) const { return get_array().at(index); }
+
+    toml &toml::front() { return get_array().front(); }
+    const toml &toml::front() const { return get_array().front(); }
+    toml &toml::back() { return get_array().back(); }
+    const toml &toml::back() const { return get_array().back(); }
+
+    void toml::push_back(const toml &value)
+    {
+        ensure_array();
+        get_array().push_back(value);
+    }
+
+    void toml::push_back(toml &&value)
+    {
+        ensure_array();
+        get_array().push_back(std::move(value));
+    }
+
+    void toml::push_front(const toml &value)
+    {
+        ensure_array();
+        get_array().insert(get_array().begin(), value);
+    }
+
+    toml::iterator toml::insert(const const_iterator &pos, const toml &value)
+    {
+        ensure_array();
+        const auto index = static_cast<size_type>(std::distance(cbegin(), pos));
+        auto it = get_array().insert(get_array().cbegin() + static_cast<difference_type>(index), value);
+        return iterator(it);
+    }
+
+    toml::iterator toml::insert(const const_iterator &pos, toml &&value)
+    {
+        ensure_array();
+        const auto index = static_cast<size_type>(std::distance(cbegin(), pos));
+        auto it = get_array().insert(get_array().cbegin() + static_cast<difference_type>(index), std::move(value));
+        return iterator(it);
+    }
+
+    toml::iterator toml::erase(const_iterator pos)
+    {
+        if (!is_array())
+        {
+            return end();
+        }
+
+        const auto index = static_cast<size_type>(std::distance(cbegin(), pos));
+        auto it = get_array().erase(get_array().cbegin() + static_cast<difference_type>(index));
+        return iterator(it);
+    }
+
+    toml::iterator toml::erase(const_iterator first, const_iterator last)
+    {
+        if (!is_array())
+        {
+            return end();
+        }
+
+        const auto begin_index = static_cast<size_type>(std::distance(cbegin(), first));
+        const auto end_index = static_cast<size_type>(std::distance(cbegin(), last));
+
+        auto it = get_array().erase(
+            get_array().cbegin() + static_cast<difference_type>(begin_index),
+            get_array().cbegin() + static_cast<difference_type>(end_index));
+        return iterator(it);
+    }
+
+    //========== Size and Capacity ==========
+
+    size_t toml::size() const noexcept
+    {
+        if (is_table())
+            return get_table().size();
+        if (is_array())
+            return get_array().size();
+        return 0;
+    }
+
+    bool toml::empty() const noexcept
+    {
+        if (is_table())
+            return get_table().empty();
+        if (is_array())
+            return get_array().empty();
+        return size() == 0;
+    }
+
+    void toml::clear() noexcept
+    {
+        if (is_table())
+            get_table().clear();
+        else if (is_array())
+            get_array().clear();
+    }
+
+    //========== Assignment ==========
+
+    toml &toml::operator=(const toml &other) = default;
+    toml &toml::operator=(toml &&other) noexcept = default;
+
+    toml &toml::operator=(std::nullptr_t) noexcept
+    {
+        m_value = nullptr;
+        return *this;
+    }
+
+    toml &toml::operator=(bool value) noexcept
+    {
+        m_value = value;
+        return *this;
+    }
+
+    toml &toml::operator=(int value) noexcept
+    {
+        m_value = static_cast<integer_t>(value);
+        return *this;
+    }
+
+    toml &toml::operator=(integer_t value) noexcept
+    {
+        m_value = value;
+        return *this;
+    }
+
+    toml &toml::operator=(number_t value) noexcept
+    {
+        m_value = value;
+        return *this;
+    }
+
+    toml &toml::operator=(const string_t &value)
+    {
+        m_value = value;
+        return *this;
+    }
+
+    toml &toml::operator=(const char *value)
+    {
+        m_value = string_t(value != nullptr ? value : "");
+        return *this;
+    }
+
+    toml &toml::operator=(const array_t &value)
+    {
+        m_value = value;
+        return *this;
+    }
+
+    toml &toml::operator=(const table_t &value)
+    {
+        m_value = value;
+        return *this;
+    }
+
+    toml &toml::operator=(initializer_list_t init)
+    {
+        *this = toml(init);
+        return *this;
+    }
+
+    //========== Type Information ==========
+
+    toml::value_t toml::type() const noexcept
+    {
+        switch (m_value.index())
+        {
+        case 0:
+            return value_t::null;
+        case 1:
+            return value_t::boolean;
+        case 2:
+            return value_t::integer;
+        case 3:
+            return value_t::number;
+        case 4:
+            return value_t::string;
+        case 5:
+            return value_t::array;
+        case 6:
+            return value_t::table;
         default:
-            break;
+            return value_t::null;
+        }
+    }
+
+    namespace
+    {
+        using namespace mytoml::detail;
+
+        inline std::string ltrim(std::string s)
+        {
+            size_t i = 0;
+            while (i < s.size() && std::isspace(static_cast<unsigned char>(s[i])))
+                ++i;
+            s.erase(0, i);
+            return s;
         }
 
-        char tmp[128];
-        int n = snprintf(tmp, sizeof(tmp), " [encoding: %s]", enc_name);
-        if (n > 0)
+        inline std::string rtrim(std::string s)
         {
-            buffer.append(tmp, static_cast<size_t>(n));
+            size_t i = s.size();
+            while (i > 0 && std::isspace(static_cast<unsigned char>(s[i - 1])))
+                --i;
+            s.erase(i);
+            return s;
         }
 
-        // If data is provided, append a short hex preview (up to 8 bytes)
-        if (data != nullptr && size > 0)
+        inline std::string trim(const std::string &s) { return rtrim(ltrim(s)); }
+
+        toml parse_value(const std::string &text);
+
+        std::vector<std::string> split_top_level(const std::string &text, char delim)
         {
-            const unsigned char *b = reinterpret_cast<const unsigned char *>(data);
-            size_t preview = (size < 8) ? size : 8; // limit
-            buffer.append(" [data: 0x");
-            for (size_t i = 0; i < preview; ++i)
+            std::vector<std::string> parts;
+            std::string current;
+            int depth_brace = 0;
+            int depth_bracket = 0;
+            bool in_string = false;
+            for (size_t i = 0; i < text.size(); ++i)
             {
-                int written = snprintf(tmp, sizeof(tmp), "%02x", b[i]);
-                if (written > 0)
+                char c = text[i];
+                if (c == '"' && (i == 0 || text[i - 1] != '\\'))
+                    in_string = !in_string;
+                if (!in_string)
                 {
-                    buffer.append(tmp, static_cast<size_t>(written));
+                    if (c == '{')
+                        ++depth_brace;
+                    else if (c == '}')
+                        --depth_brace;
+                    else if (c == '[')
+                        ++depth_bracket;
+                    else if (c == ']')
+                        --depth_bracket;
+                    else if (c == delim && depth_brace == 0 && depth_bracket == 0)
+                    {
+                        parts.push_back(trim(current));
+                        current.clear();
+                        continue;
+                    }
                 }
+                current.push_back(c);
             }
-            if (size > preview)
-            {
-                buffer.append("...");
-            }
-            buffer.append("]");
+            if (!current.empty())
+                parts.push_back(trim(current));
+            return parts;
         }
 
-        return buffer.c_str();
-    };
-
-#endif // MYTOML_NO_EXCEPTIONS
-
-    MYTOML_VERSION_NAMESPACE_END
-
-}; // namespace mytoml
-
-#pragma endregion // Mytoml
-
-#pragma region Literal
-
-namespace mytoml
-{
-
-    MYTOML_VERSION_NAMESPACE_BEGIN
-
-    namespace literals
-    {
-
-        //-----------------------------------------------------------------------------
-        // [SECTION] Literals : Toml
-        //-----------------------------------------------------------------------------
-
-        // Literal operators implemented in later section.
-
-    }; // namespace literals
-
-    MYTOML_VERSION_NAMESPACE_END
-
-}; // namespace mytoml
-
-#pragma endregion // Literal
-
-#endif // MYTOML_IMPLEMENTATION
-
-//==============================================================================
-// Minimal TOML value implementation (tables, arrays, scalars) + parse/emit
-//==============================================================================
-
-namespace
-{
-    using namespace mytoml;
-
-    inline std::string ltrim(std::string s)
-    {
-        size_t i = 0;
-        while (i < s.size() && std::isspace(static_cast<unsigned char>(s[i])))
-            ++i;
-        s.erase(0, i);
-        return s;
-    }
-
-    inline std::string rtrim(std::string s)
-    {
-        size_t i = s.size();
-        while (i > 0 && std::isspace(static_cast<unsigned char>(s[i - 1])))
-            --i;
-        s.erase(i);
-        return s;
-    }
-
-    inline std::string trim(const std::string &s) { return rtrim(ltrim(s)); }
-
-    toml parse_value(const std::string &text);
-
-    std::vector<std::string> split_top_level(const std::string &text, char delim)
-    {
-        std::vector<std::string> parts;
-        std::string current;
-        int depth_brace = 0;
-        int depth_bracket = 0;
-        bool in_string = false;
-        for (size_t i = 0; i < text.size(); ++i)
+        toml parse_inline_table(const std::string &body)
         {
-            char c = text[i];
-            if (c == '"' && (i == 0 || text[i - 1] != '\\'))
-                in_string = !in_string;
-            if (!in_string)
+            toml::table_t table;
+            auto parts = split_top_level(body, ',');
+            for (const auto &entry : parts)
             {
-                if (c == '{')
-                    ++depth_brace;
-                else if (c == '}')
-                    --depth_brace;
-                else if (c == '[')
-                    ++depth_bracket;
-                else if (c == ']')
-                    --depth_bracket;
-                else if (c == delim && depth_brace == 0 && depth_bracket == 0)
-                {
-                    parts.push_back(trim(current));
-                    current.clear();
+                if (entry.empty())
                     continue;
-                }
+                auto eq = entry.find('=');
+                if (eq == std::string::npos)
+                    throw parse_error("invalid inline table entry");
+                auto key = trim(entry.substr(0, eq));
+                auto value_text = trim(entry.substr(eq + 1));
+                table[key] = parse_value(value_text);
             }
-            current.push_back(c);
+            return toml{table};
         }
-        if (!current.empty())
-            parts.push_back(trim(current));
-        return parts;
-    }
 
-    toml parse_inline_table(const std::string &body)
-    {
-        toml::table_t table;
-        auto parts = split_top_level(body, ',');
-        for (const auto &entry : parts)
+        toml parse_array(const std::string &body)
         {
-            if (entry.empty())
-                continue;
-            auto eq = entry.find('=');
-            if (eq == std::string::npos)
-                throw parse_error("invalid inline table entry");
-            auto key = trim(entry.substr(0, eq));
-            auto value_text = trim(entry.substr(eq + 1));
-            table[key] = parse_value(value_text);
-        }
-        return toml{table};
-    }
-
-    toml parse_array(const std::string &body)
-    {
-        toml::array_t arr;
-        auto parts = split_top_level(body, ',');
-        for (const auto &entry : parts)
-        {
-            if (entry.empty())
-                continue;
-            arr.push_back(parse_value(entry));
-        }
-        return toml{arr};
-    }
-
-    toml parse_string(const std::string &text)
-    {
-        if (text.size() < 2 || text.front() != '"' || text.back() != '"')
-            throw parse_error("invalid string literal");
-        std::string out;
-        for (size_t i = 1; i + 1 < text.size(); ++i)
-        {
-            char c = text[i];
-            if (c == '\\' && i + 1 < text.size() - 1)
+            toml::array_t arr;
+            auto parts = split_top_level(body, ',');
+            for (const auto &entry : parts)
             {
-                char n = text[++i];
-                switch (n)
+                if (entry.empty())
+                    continue;
+                arr.push_back(parse_value(entry));
+            }
+            return toml{arr};
+        }
+
+        toml parse_string(const std::string &text)
+        {
+            if (text.size() < 2 || text.front() != '"' || text.back() != '"')
+                throw parse_error("invalid string literal");
+            std::string out;
+            for (size_t i = 1; i + 1 < text.size(); ++i)
+            {
+                char c = text[i];
+                if (c == '\\' && i + 1 < text.size() - 1)
                 {
-                case 'n':
-                    out.push_back('\n');
-                    break;
-                case 't':
-                    out.push_back('\t');
-                    break;
-                case '"':
-                    out.push_back('"');
-                    break;
-                case '\\':
-                    out.push_back('\\');
-                    break;
-                default:
-                    out.push_back(n);
-                    break;
+                    char n = text[++i];
+                    switch (n)
+                    {
+                    case 'n':
+                        out.push_back('\n');
+                        break;
+                    case 't':
+                        out.push_back('\t');
+                        break;
+                    case '"':
+                        out.push_back('"');
+                        break;
+                    case '\\':
+                        out.push_back('\\');
+                        break;
+                    default:
+                        out.push_back(n);
+                        break;
+                    }
+                }
+                else
+                {
+                    out.push_back(c);
                 }
             }
-            else
+            return toml{out};
+        }
+
+        toml parse_value(const std::string &raw)
+        {
+            auto text = trim(raw);
+            if (text.empty())
+                throw parse_error("empty value");
+
+            // String
+            if (text.front() == '"')
+                return parse_string(text);
+
+            // Inline table
+            if (text.front() == '{')
             {
-                out.push_back(c);
+                if (text.back() != '}')
+                    throw parse_error("unterminated inline table");
+                return parse_inline_table(text.substr(1, text.size() - 2));
+            }
+
+            // Array
+            if (text.front() == '[')
+            {
+                if (text.back() != ']')
+                    throw parse_error("unterminated array");
+                return parse_array(text.substr(1, text.size() - 2));
+            }
+
+            // Boolean
+            if (text == "true")
+                return toml{true};
+            if (text == "false")
+                return toml{false};
+
+            // Number detection
+            bool has_dot = false;
+            bool has_exp = false;
+            size_t start = (text[0] == '+' || text[0] == '-') ? 1 : 0;
+            for (size_t i = start; i < text.size(); ++i)
+            {
+                if (text[i] == '.')
+                    has_dot = true;
+                if (text[i] == 'e' || text[i] == 'E')
+                    has_exp = true;
+            }
+            try
+            {
+                if (has_dot || has_exp)
+                {
+                    double d = std::stod(text);
+                    return toml{d};
+                }
+                int64_t v = std::stoll(text);
+                return toml{v};
+            }
+            catch (...)
+            {
+                // Fallback: bare string
+                return toml{text};
             }
         }
-        return toml{out};
-    }
 
-    toml parse_value(const std::string &raw)
-    {
-        auto text = trim(raw);
-        if (text.empty())
-            throw parse_error("empty value");
-
-        // String
-        if (text.front() == '"')
-            return parse_string(text);
-
-        // Inline table
-        if (text.front() == '{')
+        void ensure_path(toml::table_t &root, const std::vector<std::string> &keys, size_t upto, toml::table_t **out)
         {
-            if (text.back() != '}')
-                throw parse_error("unterminated inline table");
-            return parse_inline_table(text.substr(1, text.size() - 2));
-        }
-
-        // Array
-        if (text.front() == '[')
-        {
-            if (text.back() != ']')
-                throw parse_error("unterminated array");
-            return parse_array(text.substr(1, text.size() - 2));
-        }
-
-        // Boolean
-        if (text == "true")
-            return toml{true};
-        if (text == "false")
-            return toml{false};
-
-        // Number detection
-        bool has_dot = false;
-        bool has_exp = false;
-        size_t start = (text[0] == '+' || text[0] == '-') ? 1 : 0;
-        for (size_t i = start; i < text.size(); ++i)
-        {
-            if (text[i] == '.')
-                has_dot = true;
-            if (text[i] == 'e' || text[i] == 'E')
-                has_exp = true;
-        }
-        try
-        {
-            if (has_dot || has_exp)
+            toml::table_t *cur = &root;
+            for (size_t i = 0; i < upto; ++i)
             {
-                double d = std::stod(text);
-                return toml{d};
+                auto &slot = (*cur)[keys[i]];
+                if (!slot.is_table())
+                    slot = toml::table_t{};
+                cur = &slot.as_table();
             }
-            int64_t v = std::stoll(text);
-            return toml{v};
-        }
-        catch (...)
-        {
-            // Fallback: bare string
-            return toml{text};
+            *out = cur;
         }
     }
-
-    void ensure_path(toml::table_t &root, const std::vector<std::string> &keys, size_t upto, toml::table_t **out)
-    {
-        toml::table_t *cur = &root;
-        for (size_t i = 0; i < upto; ++i)
-        {
-            auto &slot = (*cur)[keys[i]];
-            if (!slot.is_table())
-                slot = toml::table_t{};
-            cur = &slot.as_table();
-        }
-        *out = cur;
-    }
-}
-
-namespace mytoml
-{
-    MYTOML_VERSION_NAMESPACE_BEGIN
-
-    toml::toml() : m_value{nullptr} {}
-    toml::toml(table_t value) : m_value(std::move(value)) {}
-    toml::toml(array_t value) : m_value(std::move(value)) {}
-    toml::toml(std::string value) : m_value(std::move(value)) {}
-    toml::toml(const char *value) : m_value(std::string(value)) {}
-    toml::toml(int64_t value) : m_value(value) {}
-    toml::toml(double value) : m_value(value) {}
-    toml::toml(bool value) : m_value(value) {}
 
     toml toml::parse(const std::string &text)
     {
@@ -1854,28 +2661,34 @@ namespace mytoml
         return toml{root};
     }
 
-    node_t toml::type() const noexcept
+    toml::value_t toml::type() const noexcept
     {
-        if (std::holds_alternative<table_t>(m_value))
-            return node_t::table;
-        if (std::holds_alternative<array_t>(m_value))
-            return node_t::array;
-        if (std::holds_alternative<std::string>(m_value))
-            return node_t::string;
-        if (std::holds_alternative<int64_t>(m_value))
-            return node_t::integer;
-        if (std::holds_alternative<double>(m_value))
-            return node_t::floating;
-        if (std::holds_alternative<bool>(m_value))
-            return node_t::boolean;
-        return node_t::unknown;
+        switch (m_value.index())
+        {
+        case 0:
+            return value_t::null;
+        case 1:
+            return value_t::boolean;
+        case 2:
+            return value_t::integer;
+        case 3:
+            return value_t::number;
+        case 4:
+            return value_t::string;
+        case 5:
+            return value_t::array;
+        case 6:
+            return value_t::table;
+        default:
+            return value_t::null;
+        }
     }
 
     bool toml::is_table() const noexcept { return type() == node_t::table; }
     bool toml::is_array() const noexcept { return type() == node_t::array; }
     bool toml::is_string() const noexcept { return type() == node_t::string; }
     bool toml::is_integer() const noexcept { return type() == node_t::integer; }
-    bool toml::is_floating() const noexcept { return type() == node_t::floating; }
+    bool toml::is_floating() const noexcept { return type() == node_t::number; }
     bool toml::is_boolean() const noexcept { return type() == node_t::boolean; }
 
     toml::table_t &toml::as_table() { return std::get<table_t>(m_value); }
@@ -1927,19 +2740,19 @@ namespace mytoml
         {
             switch (node.type())
             {
-            case node_t::string:
+            case value_t::string:
                 out << '"' << node.as_string() << '"';
                 break;
-            case node_t::integer:
+            case value_t::integer:
                 out << node.as_integer();
                 break;
-            case node_t::floating:
+            case value_t::number:
                 out << node.as_floating();
                 break;
-            case node_t::boolean:
+            case value_t::boolean:
                 out << (node.as_boolean() ? "true" : "false");
                 break;
-            case node_t::array:
+            case value_t::array:
             {
                 out << "[";
                 const auto &arr = node.as_array();
@@ -1952,7 +2765,7 @@ namespace mytoml
                 out << "]";
                 break;
             }
-            case node_t::table:
+            case value_t::table:
             {
                 out << "{ ";
                 const auto &tbl = node.as_table();
@@ -1972,7 +2785,7 @@ namespace mytoml
                 break;
             }
         }
-    }
+    };
 
     std::string toml::dump(int /*indent*/) const
     {
@@ -1986,7 +2799,16 @@ namespace mytoml
             dump_value(*this, out);
         }
         return out.str();
-    }
+    };
+
+    //-----------------------------------------------------------------------------
+    // [SECTION] Mytoml : Functions
+    //-----------------------------------------------------------------------------
+    // - operator<<()
+    // - operator>>()
+    //-----------------------------------------------------------------------------
+
+#ifndef MYTOML_NO_STL
 
     const char *string(encoding type)
     {
@@ -2009,93 +2831,114 @@ namespace mytoml
         default:
             return "unspecified";
         }
-    }
+    };
 
     const char *string(node_t type)
     {
-        switch (type)
-        {
-        case node_t::table:
-            return "table";
-        case node_t::array:
-            return "array";
-        case node_t::string:
-            return "string";
-        case node_t::integer:
-            return "integer";
-        case node_t::floating:
-            return "floating";
-        case node_t::boolean:
-            return "boolean";
-        default:
-            return "unknown";
-        }
-    }
+        return "";
+    };
 
-#ifndef MYTOML_NO_STL
-    std::ostream &operator<<(std::ostream &ostream, const encoding &type)
+    std::ostream &operator<<(std::ostream &stream, const encoding &type)
     {
-        ostream << string(type);
-        return ostream;
-    }
+        stream << string(type);
+        return stream;
+    };
 
-    std::ostream &operator<<(std::ostream &ostream, const node_t &type)
+    std::ostream &operator<<(std::ostream &stream, const node_t &type)
     {
-        ostream << string(type);
-        return ostream;
-    }
+        stream << string(type);
+        return stream;
+    };
 
     std::ostream &operator<<(std::ostream &stream, const toml &node)
     {
+        // detail::stream_oadapter adapter(ostream);
+        // detail::serializer output(&adapter);
+        // output.serialize(node, -1);
+
         stream << node.dump();
         return stream;
-    }
+    };
 
-    std::istream &operator>>(std::istream &stream, const toml &node)
+    std::istream &operator>>(std::istream &stream, toml &node)
     {
+        // node = toml::parse(stream);
+
         std::ostringstream buffer;
         buffer << stream.rdbuf();
         const_cast<toml &>(node) = toml::parse(buffer.str());
         return stream;
-    }
-#endif // MYTOML_NO_STL
+    };
 
-#ifndef MYTOML_NO_STL
-    toml literals::toml_literals::MYTOML_QUOTE_OPERATOR(const char *string, size_t size)
-    {
-        return toml::parse(std::string(string, size));
-    }
-
-#if MYTOML_HAS_CHAR8_T
-    toml literals::toml_literals::MYTOML_QUOTE_OPERATOR(const char8_t *string, size_t size)
-    {
-        return toml::parse(std::string(reinterpret_cast<const char *>(string), size));
-    }
-#endif // MYTOML_HAS_CHAR8_T
-
-    toml literals::toml_literals::MYTOML_QUOTE_OPERATOR(const char16_t *string, size_t size)
-    {
-        std::u16string u16(string, size);
-        std::string utf8;
-        utf8.reserve(u16.size());
-        for (char16_t c : u16)
-            utf8.push_back(static_cast<char>(c));
-        return toml::parse(utf8);
-    }
-
-    toml literals::toml_literals::MYTOML_QUOTE_OPERATOR(const char32_t *string, size_t size)
-    {
-        std::u32string u32(string, size);
-        std::string utf8;
-        utf8.reserve(u32.size());
-        for (char32_t c : u32)
-            utf8.push_back(static_cast<char>(c));
-        return toml::parse(utf8);
-    }
 #endif // MYTOML_NO_STL
 
     MYTOML_VERSION_NAMESPACE_END
-} // namespace mytoml
+
+}; // namespace mytoml
+
+#pragma endregion // Mytoml
+
+#pragma region Literal
+
+namespace mytoml
+{
+
+    MYTOML_VERSION_NAMESPACE_BEGIN
+
+    namespace literals
+    {
+
+        inline namespace toml_literals
+        {
+
+            //-----------------------------------------------------------------------------
+            // [SECTION] Literals : Toml
+            //-----------------------------------------------------------------------------
+
+            toml MYTOML_QUOTE_OPERATOR(const char *string, size_t size)
+            {
+                return toml::parse(std::string(string, size));
+            };
+
+#if MYTOML_HAS_CHAR8_T
+
+            toml MYTOML_QUOTE_OPERATOR(const char8_t *string, size_t size)
+            {
+                return toml::parse(std::string(reinterpret_cast<const char *>(string), size));
+            };
+
+#endif // MYTOML_HAS_CHAR8_T
+
+            toml MYTOML_QUOTE_OPERATOR(const char16_t *string, size_t size)
+            {
+                std::u16string u16(string, size);
+                std::string utf8;
+                utf8.reserve(u16.size());
+                for (char16_t c : u16)
+                    utf8.push_back(static_cast<char>(c));
+                return toml::parse(utf8);
+            };
+
+            toml MYTOML_QUOTE_OPERATOR(const char32_t *string, size_t size)
+            {
+                std::u32string u32(string, size);
+                std::string utf8;
+                utf8.reserve(u32.size());
+                for (char32_t c : u32)
+                    utf8.push_back(static_cast<char>(c));
+                return toml::parse(utf8);
+            };
+
+        }; // namespace toml_literals
+    }; // namespace literals
+
+    MYTOML_VERSION_NAMESPACE_END
+
+}; // namespace mytoml
+
+#pragma endregion // Literal
+
+#endif // MYTOML_IMPLEMENTATION
 
 // NOLINTEND
 

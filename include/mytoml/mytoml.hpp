@@ -171,6 +171,7 @@
 #include <iostream>
 
 #include <optional>
+    #include <iterator>
 
 //-----------------------------------------------------------------------------
 // [SECTION] Configurations
@@ -670,6 +671,10 @@
     #define MYTOML_CONSTEXPR
 #endif
 
+#ifndef MYTOML_NODISCARD
+    #define MYTOML_NODISCARD [[nodiscard]]
+#endif
+
 // switch usage of [[likely]] C++ attribute which has been available since C++20.
 #if defined(MYTOML_HAS_CXX_20) && MYTOML_HAS_CPP_ATTRIBUTE(likely) >= 201803L
     #define MYTOML_LIKELY(expr) (!!(expr)) [[likely]]
@@ -821,52 +826,73 @@ namespace mytoml
     namespace detail
     {
         //-----------------------------------------------------------------------------
-        // [SECTION] Details Declarations
+        // [SECTION] Details Forward
         //-----------------------------------------------------------------------------
 
         /** Enumerations */
 
-        enum class token_t : uint8_t;
-        enum class error_t : uint8_t;
-        enum class event_t : uint8_t;
-        enum class value_t : uint8_t;
-        enum class break_t : uint8_t;
+        enum class token_t : uint8_t; /** enum token type. */
+        enum class error_t : uint8_t; /** enum token type. */
+        enum class event_t : uint8_t; /** enum token type. */
+        enum class value_t : uint8_t; /** enum token type. */
+        enum class break_t : uint8_t; /** enum token type. */
 
         /** Structures */
 
-        struct mark;
-        struct event;
-        struct token;
+        struct mark;  /** struct mark. */
+        struct event; /** struct event. */
+        struct token; /** struct event. */
+
+#ifndef MYTOML_NO_EXCEPTIONS
+        // exception
+        class exception;      /** class exception. */
+        class io_error;       /** class io_error. */
+        class type_error;     /** class type_error. */
+        class parse_error;    /** class parse_error. */
+        class access_error;   /** class access_error. */
+        class encoding_error; /** class encoding_error. */
+#endif                        // MYTOML_NO_EXCEPTIONS
+
+        // iterator
+
+        template <typename node_type>
+        struct iterator_holder; /** class iterator_holder. */
+
+        template <typename node_type>
+        class iterator; /** class iterator. */
+
+        template <typename iterator_type>
+        class reverse_iterator; /** class reverse_iterator. */
 
         // input
-        class lexer;
-        class parser;
-        class iadapter;
-        class deserializer;
-        class file_iadapter;
-        class memory_iadapter;
+        class lexer;           /** class lexer. */
+        class parser;          /** class parser. */
+        class iadapter;        /** class iadapter. */
+        class deserializer;    /** class deserializer. */
+        class file_iadapter;   /** class file_iadapter. */
+        class memory_iadapter; /** class memory_iadapter. */
 
 #ifndef MYTOML_NO_STL
-        class stream_iadapter;
-        class iterator_iadapter;
-#endif // MYTOML_NO_STL
+        class stream_iadapter;   /** class stream_iadapter. */
+        class iterator_iadapter; /** class iterator_iadapter. */
+#endif                           // MYTOML_NO_STL
 
         // output
-        class emitter;
-        class oadapter;
-        class serializer;
-        class file_iadapter;
-        class memory_oadapter;
+        class emitter;         /** class emitter. */
+        class oadapter;        /** class oadapter. */
+        class serializer;      /** class serializer. */
+        class file_iadapter;   /** class file_iadapter. */
+        class memory_oadapter; /** class memory_oadapter. */
 
 #ifndef MYTOML_NO_STL
-        class stream_oadapter;
-        class iterator_oadapter;
-#endif // MYTOML_NO_STL
+        class stream_oadapter;   /** class stream_oadapter. */
+        class iterator_oadapter; /** class iterator_oadapter. */
+#endif                           // MYTOML_NO_STL
 
         // encoding
-        struct utf8;
-        struct utf16;
-        struct utf32;
+        struct utf8;  /** struct utf8. */
+        struct utf16; /** struct utf16. */
+        struct utf32; /** struct utf32. */
 
     } // namespace detail
 
@@ -883,7 +909,7 @@ namespace mytoml
     MYTOML_VERSION_NAMESPACE_BEGIN
 
     //-----------------------------------------------------------------------------
-    // [SECTION] Mytoml Declarations
+    // [SECTION] Mytoml Forward
     //-----------------------------------------------------------------------------
 
     /** Enumerations */
@@ -893,16 +919,8 @@ namespace mytoml
 
     /** Structures */
 
-    class toml;
-    class version;
-    class formatter;
-
-#ifndef MYTOML_NO_EXCEPTIONS
-    class exception;
-    class io_error;
-    class parse_error;
-    class encoding_error;
-#endif // MYTOML_NO_EXCEPTIONS
+    class toml;    /** class toml. */
+    class version; /** class version. */
 
     MYTOML_VERSION_NAMESPACE_END
 
@@ -919,7 +937,7 @@ namespace mytoml
     namespace literals
     {
         //-----------------------------------------------------------------------------
-        // [SECTION] Literals Declarations
+        // [SECTION] Literals Forward
         //-----------------------------------------------------------------------------
 
     } // namespace literals
@@ -947,11 +965,11 @@ namespace mytoml
     namespace detail
     {
         //-----------------------------------------------------------------------------
-        // [SECTION] Details : Flags & Enumerations
+        // [SECTION] Details : Enums
         //-----------------------------------------------------------------------------
 
         /**
-         * @defgroup enum Flags & Enumerations
+         * @defgroup enum Enums
          * @brief Detail enum types and flags.
          * @{
          */
@@ -995,6 +1013,14 @@ namespace mytoml
         enum class value_t : uint8_t
         {
             unknown,
+            null,    ///< null value
+            table,   ///< table (map of string to toml)
+            array,   ///< array (vector of toml values)
+            string,  ///< string value
+            number,  ///< numeric value (floating point)
+            integer, ///< integer value
+            boolean  ///< boolean value
+
         };
 
         enum class break_t : uint8_t
@@ -1050,6 +1076,151 @@ namespace mytoml
         /** @} group structs */
 
         //-----------------------------------------------------------------------------
+        // [SECTION] Details : Traits
+        //-----------------------------------------------------------------------------
+
+        /**
+         * @defgroup traits Traits
+         * @brief Traits.
+         * @{
+         */
+
+        /** @} group traits */
+
+        //-----------------------------------------------------------------------------
+        // [SECTION] Details : Exception
+        //-----------------------------------------------------------------------------
+
+#ifndef MYTOML_NO_EXCEPTIONS
+
+        /**
+         * @defgroup exception
+         * @brief
+         */
+
+        /**
+         * @class mytoml::exception
+         * @brief A base exception class used in library.
+         */
+        class exception : public std::exception
+        {
+        public:
+            /**
+             * @brief Construct a new exception object without any error messages.
+             */
+            exception() = default;
+
+            /**
+             * @brief Construct a new exception object with an error messages.
+             * @param[in] message An error message.
+             */
+            explicit exception(const char *message) noexcept;
+
+            /**
+             * @brief Returns an error message internally held. If nothing, a non-null,
+             * empty string will be returned.
+             * @return An error message internally held. The message might be empty.
+             */
+            MYTOML_NODISCARD const char *what() const noexcept override;
+
+        private:
+            std::string m_Message; /** An error message holder. */
+        };
+
+        class parse_error : public exception
+        {
+        public:
+            /**
+             * @brief Construct a new parse_error object.
+             *
+             * @param message An error message.
+             */
+            explicit parse_error(const char *message) noexcept;
+
+            /**
+             * @brief Construct a new encoding_error object.
+             *
+             * @param msg An error message.
+             * @param mark The error position.
+             */
+            parse_error(const char *message, detail::mark mark) noexcept;
+
+        private:
+            /**
+             * @brief Generate an error message from the given parameters.
+             *
+             * This helper constructs a human-readable error message that
+             * includes the supplied @p message and positional information from
+             * @p mark (line, column, index). The returned C-string pointer is a
+             * pointer into an internal, thread-local buffer owned by the
+             * implementation. The pointer is valid until the next call to this
+             * function on the same thread. Callers (for example the
+             * exception constructors) should immediately copy the returned
+             * string if they need to retain it long-term.
+             *
+             * @param message An error message. May be nullptr.
+             * @param mark The error position.
+             *
+             * @return Pointer to a null-terminated C-string describing the error.
+             */
+            static const char *generate(const char *message, detail::mark mark) noexcept;
+        };
+
+        class encoding_error : public exception
+        {
+        public:
+            /**
+             * @brief Construct a new encoding_error object.
+             *
+             * @param message An error message.
+             */
+            explicit encoding_error(const char *message) noexcept;
+
+            /**
+             * @brief Construct a new encoding_error object.
+             *
+             * @param encoding The encoding.
+             * @param message An error message.
+             * @param data The Encoded character.
+             * @param size Number of bytes of data.
+             */
+            encoding_error(encoding encoding, const char *message, void *data, size_t size) noexcept;
+
+        private:
+            /**
+             * @brief Generate an error message from encoding-related parameters.
+             *
+             * Builds a human-readable message including the @p message, the
+             * detected @p encoding and a short hex representation of the
+             * problematic @p data (up to a small limit). The returned pointer
+             * points into an internal, thread-local buffer and is valid until
+             * the next call to this function on the same thread. Callers must
+             * copy the string if they need to keep it beyond the immediate use
+             * (the exception constructors copy it into their member storage).
+             *
+             * @param encoding The detected encoding for the data.
+             * @param message An error message. May be nullptr.
+             * @param data Pointer to the raw encoded character bytes, or nullptr.
+             * @param size Number of bytes available at @p data.
+             *
+             * @return Pointer to a null-terminated C-string describing the error.
+             */
+            static const char *generate(encoding encoding, const char *message, void *data, size_t size) noexcept;
+        };
+
+        class type_error : public exception
+        {
+        };
+
+        class access_error : public exception
+        {
+        };
+
+        /** @} group exception */
+
+#endif // MYTOML_NO_EXCEPTIONS
+
+        //-----------------------------------------------------------------------------
         // [SECTION] Details : Encoding
         //-----------------------------------------------------------------------------
 
@@ -1064,29 +1235,29 @@ namespace mytoml
 
         using encoding = mytoml::encoding;
 
-#if defined(__cpp_lib_endian)
+#ifdef endian
+#undef endian
+#endif
 
         /**
-         * @brief Standard-compliant enum class representing endianness.
+         * @brief Internal numeric endianness representation.
          */
-        using endian = std::endian;
-#else
-        /**
-         * @brief Indicates the byte order (endianness) of scalar types.
-         */
-        enum class endian
+        using mytoml_endian_value_t = uint16_t;
+
+        struct mytoml_endian_t
         {
 #if MYTOML_COMPILER_IS_GCC
-            little = __ORDER_LITTLE_ENDIAN__,
-            big = __ORDER_BIG_ENDIAN__,
-            native = __BYTE_ORDER__
+            static constexpr mytoml_endian_value_t little = __ORDER_LITTLE_ENDIAN__;
+            static constexpr mytoml_endian_value_t big = __ORDER_BIG_ENDIAN__;
+            static constexpr mytoml_endian_value_t native = __BYTE_ORDER__;
 #else
-            little = 0,
-            big = 1,
-            native = little
+            static constexpr mytoml_endian_value_t little = 0;
+            static constexpr mytoml_endian_value_t big = 1;
+            static constexpr mytoml_endian_value_t native = little;
 #endif // MYTOML_COMPILER_IS_GCC
         };
-#endif // __cpp_lib_endian
+
+        using endian = mytoml_endian_t;
 
         /**
          * @brief Determine the text encoding of the supplied buffer.
@@ -1175,7 +1346,7 @@ namespace mytoml
              * @param order Desired byte order for output (default: native).
              * @return A vector of bytes containing the UTF-16 encoding.
              */
-            static std::vector<unsigned char> to_utf16(const std::string &string, endian order = endian::native);
+            static std::vector<unsigned char> to_utf16(const std::string &string, mytoml_endian_value_t order);
 
             /**
              * @brief Convert a UTF-8 std::string to a UTF-32 byte vector.
@@ -1187,7 +1358,7 @@ namespace mytoml
              * @param order Desired byte order for output (default: native).
              * @return A vector of bytes containing the UTF-32 encoding.
              */
-            static std::vector<unsigned char> to_utf32(const std::string &string, endian order = endian::native);
+            static std::vector<unsigned char> to_utf32(const std::string &string, mytoml_endian_value_t order);
         };
 
         /**
@@ -1215,7 +1386,7 @@ namespace mytoml
              * @param order Order to interprete incoming bytes.
              * @return Number of bytes consumed (2 or 4) or -1 on error.
              */
-            static int decode(const char *data, size_t size, unsigned int &value, endian order = endian::native);
+            static int decode(const char *data, size_t size, unsigned int &value, mytoml_endian_value_t order);
 
             /**
              * @brief Encode a Unicode code point into UTF-16 code units.
@@ -1230,7 +1401,7 @@ namespace mytoml
              * @param order Order to represent/write the code units (codepoint) in.
              * @return Number of UTF-16 bytes written (2 or 4) or -1 on error.
              */
-            static int encode(unsigned int codepoint, char_t *output, size_t size, endian order = endian::native);
+            static int encode(unsigned int codepoint, char_t *output, size_t size, mytoml_endian_value_t order);
 
             /**
              * @brief Convert a UTF-16 byte vector into a UTF-8 std::string.
@@ -1244,7 +1415,7 @@ namespace mytoml
              *         ill-formed the function will attempt best-effort
              *         conversion and may replace invalid sequences.
              */
-            static std::string to_utf8(const std::vector<unsigned char> &bytes, endian order = endian::native);
+            static std::string to_utf8(const std::vector<unsigned char> &bytes, mytoml_endian_value_t order);
         };
 
         /**
@@ -1270,7 +1441,7 @@ namespace mytoml
              * @param order Byte order of the input bytes.
              * @return Number of bytes consumed (4) on success, or -1 on error.
              */
-            static int decode(const char *data, size_t size, unsigned int &value, endian order = endian::native);
+            static int decode(const char *data, size_t size, unsigned int &value, mytoml_endian_value_t order);
 
             /**
              * @brief Encode a Unicode code point as UTF-32.
@@ -1284,7 +1455,7 @@ namespace mytoml
              * @param order Byte order to use for the output.
              * @return Number of units written (1 == 4 bytes) or -1 on error.
              */
-            static int encode(unsigned int codepoint, char_t *output, size_t size, endian order = endian::native);
+            static int encode(unsigned int codepoint, char_t *output, size_t size, mytoml_endian_value_t order);
 
             /**
              * @brief Convert a UTF-32 byte vector into a UTF-8 std::string.
@@ -1294,10 +1465,365 @@ namespace mytoml
              * @return UTF-8 encoded std::string on success. Invalid input
              *         sequences are handled best-effort.
              */
-            static std::string to_utf8(const std::vector<unsigned char> &bytes, endian order = endian::native);
+            static std::string to_utf8(const std::vector<unsigned char> &bytes, mytoml_endian_value_t order);
         };
 
         /** @} group encoding */
+
+        //-----------------------------------------------------------------------------
+        // [SECTION] Details : Iterators
+        //-----------------------------------------------------------------------------
+
+        /**
+         * @defgroup iterator Iterators
+         * @brief Detail iterator classes.
+         * @{
+         */
+
+        template <typename node_type>
+        struct iterator_holder
+        {
+            using value_type = typename std::remove_const<node_type>::type;
+            using table_iterator = typename std::conditional<
+                std::is_const<node_type>::value,
+                typename value_type::table_t::const_iterator,
+                typename value_type::table_t::iterator>::type;
+
+            using array_iterator = typename std::conditional<
+                std::is_const<node_type>::value,
+                typename value_type::array_t::const_iterator,
+                typename value_type::array_t::iterator>::type;
+
+            table_iterator table_iter{}; /** Underlying table iterator. */
+            array_iterator array_iter{}; /** Underlying array iterator. */
+        };
+
+        template <typename node_type>
+        struct iterator_traits
+        {
+            using value_type = typename std::remove_const<node_type>::type;
+            using pointer = node_type *;
+            using reference = node_type &;
+            using const_pointer = const value_type *;
+            using const_reference = const value_type &;
+            using difference_type = std::ptrdiff_t;
+            using table_iterator = typename std::conditional<
+                std::is_const<node_type>::value,
+                typename value_type::table_t::const_iterator,
+                typename value_type::table_t::iterator>::type;
+
+            using array_iterator = typename std::conditional<
+                std::is_const<node_type>::value,
+                typename value_type::array_t::const_iterator,
+                typename value_type::array_t::iterator>::type;
+        };
+
+        /**
+         * @class iterator
+         * @brief Bidirectional iterator over TOML object and array values.
+         *
+         * The iterator stores either an table iterator or an array iterator and
+         * exposes a unified interface used by the public toml iterator API.
+         */
+        template <typename node_type>
+        class iterator
+        {
+            using other_iterator = typename std::conditional<
+                std::is_const<node_type>::value, iterator<typename std::remove_const<node_type>::type>,
+                iterator<const node_type>>::type;
+
+            friend other_iterator;
+
+        public:
+            using traits_type = iterator_traits<node_type>;            /** A type for iterator traits.  */
+            using iterator_category = std::bidirectional_iterator_tag; /** A type for iterator category tag. */
+
+            using value_type = typename traits_type::value_type;           /** A toml object type. */
+            using pointer = typename traits_type::pointer;                 /** A pointer to a toml object. */
+            using reference = typename traits_type::reference;             /** A reference to a toml object. */
+            using const_pointer = typename traits_type::const_pointer;     /** A constant pointer to a toml object. */
+            using const_reference = typename traits_type::const_reference; /** A constant reference to a toml object. */
+            using difference_type = typename traits_type::difference_type; /** A differences between toml iterators. */
+
+            using table_iterator = typename traits_type::table_iterator;
+            using array_iterator = typename traits_type::array_iterator;
+
+        public:
+            /**
+             * @brief Runtime category of the active underlying iterator.
+             */
+            enum class iterator_t : uint8_t
+            {
+                table, /** table iterator type. */
+                array, /** array iterator type. */
+            };
+
+        public:
+            /**
+             * @brief Default constructor
+             */
+            iterator() = default;
+
+            /**
+             * @brief Default copy constructor
+             */
+            iterator(const iterator &) = default;
+
+            /**
+             * @brief Default move constructor
+             */
+            iterator(iterator &&) = default;
+
+            /**
+             * @brief Construct begin-iterator from a TOML node.
+             * @param toml Pointer to TOML container (array/object).
+             */
+            explicit iterator(pointer toml) noexcept;
+
+            /**
+             * @brief Convert mutable iterator to const iterator.
+             */
+            template <typename T = node_type,
+                      typename std::enable_if<std::is_const<T>::value, int>::type = 0>
+            iterator(const other_iterator &other) noexcept;
+
+            /**
+             * @brief Construct from table iterator.
+             */
+            iterator(const table_iterator &itr) noexcept;
+
+            /**
+             * @brief Construct from array iterator.
+             */
+            iterator(const array_iterator &itr) noexcept;
+
+            /**
+             * @brief Get runtime iterator category.
+             */
+            iterator_t type() const noexcept;
+
+            /**
+             * @brief Get object key at current position.
+             * @throws exception when iterating non-object values.
+             */
+            const std::string &key() const;
+
+            /**
+             * @brief Get referenced TOML value.
+             */
+            reference value() const noexcept;
+
+            /**
+             * @brief Default copy assignment operator
+             */
+            iterator &operator=(const iterator &) = default;
+
+            /**
+             * @brief Default move assignment operator
+             */
+            iterator &operator=(iterator &&) = default;
+
+            bool operator==(const iterator &rhs) const;
+            bool operator==(const other_iterator &rhs) const;
+
+            bool operator!=(const iterator &rhs) const;
+            bool operator!=(const other_iterator &rhs) const;
+
+            bool operator<(const iterator &rhs) const;
+            bool operator<(const other_iterator &rhs) const;
+
+            bool operator<=(const iterator &rhs) const;
+            bool operator<=(const other_iterator &rhs) const;
+
+            bool operator>(const iterator &rhs) const;
+            bool operator>(const other_iterator &rhs) const;
+
+            bool operator>=(const iterator &rhs) const;
+            bool operator>=(const other_iterator &rhs) const;
+
+            /**
+             * @brief Access the referenced TOML value as a pointer.
+             */
+            pointer operator->() noexcept;
+
+            /**
+             * @brief Dereference the iterator.
+             */
+            reference operator*() const noexcept;
+
+            /**
+             * @brief Return an iterator advanced by @p i steps.
+             */
+            iterator operator+(difference_type i) const noexcept;
+
+            /**
+             * @brief Advance the iterator by @p i steps.
+             */
+            iterator &operator+=(difference_type i) noexcept;
+
+            /**
+             * @brief Pre-increment the iterator.
+             */
+            iterator &operator++() noexcept;
+
+            /**
+             * @brief Post-increment the iterator.
+             */
+            iterator operator++(int) & noexcept;
+
+            /**
+             * @brief Return an iterator moved backward by @p i steps.
+             */
+            iterator operator-(difference_type i) const noexcept;
+
+            /**
+             * @brief Move the iterator backward by @p i steps.
+             */
+            iterator &operator-=(difference_type i) noexcept;
+
+            /**
+             * @brief Pre-decrement the iterator.
+             */
+            iterator &operator--() noexcept;
+
+            /**
+             * @brief Post-decrement the iterator.
+             */
+            iterator operator--(int) & noexcept;
+
+            /**
+             * @brief Default destructor.
+             */
+            ~iterator() = default;
+
+        private:
+            pointer m_table = nullptr;             /** Parent TOML node associated with this iterator. */
+            iterator_t m_type{iterator_t::table};  /** Active iterator branch (object or array). */
+            iterator_holder<node_type> m_holder{}; /** Storage for the active underlying STL iterator. */
+        };
+
+        /**
+         * @class reverse_iterator
+         * @brief Reverse iterator adapter for toml iterators.
+         *
+         * Wraps a forward toml iterator and provides reverse traversal semantics
+         * compatible with STL reverse iterators.
+         */
+        template <typename iterator_type>
+        class reverse_iterator : public std::reverse_iterator<iterator_type>
+        {
+        public:
+            using base_iterator = std::reverse_iterator<iterator_type>; /** A shortcut to the reverse iterator adapter. */
+            using value_type = typename iterator_type::value_type;
+            using pointer = typename iterator_type::pointer;                 /** A pointer to an iterator object. */
+            using reference = typename iterator_type::reference;             /** A reference to an iterator object. */
+            using const_pointer = typename iterator_type::const_pointer;     /** A constant pointer to an iterator object. */
+            using const_reference = typename iterator_type::const_reference; /** A constant reference to an iterator object. */
+            using difference_type = typename iterator_type::difference_type; /** Represent the differences between iterators. */
+
+        public:
+            /**
+             * @brief Default constructor
+             */
+            reverse_iterator() = default;
+
+            /**
+             * @brief Construct from a forward iterator base.
+             */
+            reverse_iterator(const iterator_type &iter) noexcept;
+
+            /**
+             * @brief Construct from a std::reverse_iterator base object.
+             */
+            reverse_iterator(const base_iterator &iter) noexcept;
+
+            /**
+             * @brief Default copy constructor
+             */
+            reverse_iterator(const reverse_iterator &) = default;
+
+            /**
+             * @brief Default move constructor
+             */
+            reverse_iterator(reverse_iterator &&) = default;
+
+            /**
+             * @brief Get object key of the element currently referenced.
+             */
+            const std::string &key() const;
+
+            /**
+             * @brief Access the TOML value referenced by the reverse iterator.
+             */
+            reference value() const noexcept;
+
+            /**
+             * @brief Default copy assignment operator
+             */
+            reverse_iterator &operator=(const reverse_iterator &) = default;
+
+            /**
+             * @brief Default move assignment operator
+             */
+            reverse_iterator &operator=(reverse_iterator &&) = default;
+
+            /**
+             * @brief Random-access style offset read from current reverse position.
+             */
+            reference operator[](difference_type n) const;
+
+            /**
+             * @brief Return reverse iterator moved by @p i steps.
+             */
+            reverse_iterator operator+(difference_type i) const noexcept;
+
+            /**
+             * @brief Move reverse iterator by @p i steps.
+             */
+            reverse_iterator &operator+=(difference_type i) noexcept;
+
+            /**
+             * @brief Pre-increment (moves toward beginning in forward order).
+             */
+            reverse_iterator &operator++() noexcept;
+
+            /**
+             * @brief Post-increment reverse iterator.
+             */
+            reverse_iterator operator++(int) & noexcept;
+
+            /**
+             * @brief Return reverse iterator moved backward by @p i steps.
+             */
+            reverse_iterator operator-(difference_type i) const noexcept;
+
+            /**
+             * @brief Compute distance between two reverse iterators.
+             */
+            difference_type operator-(const reverse_iterator &other) const;
+
+            /**
+             * @brief Move reverse iterator backward by @p i steps.
+             */
+            reverse_iterator &operator-=(difference_type i) noexcept;
+
+            /**
+             * @brief Pre-decrement reverse iterator.
+             */
+            reverse_iterator &operator--() noexcept;
+
+            /**
+             * @brief Post-decrement reverse iterator.
+             */
+            reverse_iterator operator--(int) & noexcept;
+
+            /**
+             * @brief Default destructor.
+             */
+            ~reverse_iterator() = default;
+        };
+
+        /** @} group iterator */
 
         /**
          * @defgroup input
@@ -1316,7 +1842,7 @@ namespace mytoml
         {
         public:
             /**
-             * @brief Default copy assignment operator
+             * @brief Default constructor
              */
             iadapter() = default;
 
@@ -2100,120 +2626,6 @@ namespace mytoml
 
 #endif // MYTOML_NO_STL
 
-#ifndef MYTOML_NO_EXCEPTIONS
-
-    /**
-     * @class mytoml::exception
-     * @brief A base exception class used in library.
-     */
-    class exception : public std::exception
-    {
-    public:
-        /**
-         * @brief Construct a new exception object without any error messages.
-         */
-        exception() = default;
-
-        /**
-         * @brief Construct a new exception object with an error messages.
-         * @param[in] message An error message.
-         */
-        explicit exception(const char *message) noexcept;
-
-        /**
-         * @brief Returns an error message internally held. If nothing, a non-null,
-         * empty string will be returned.
-         * @return An error message internally held. The message might be empty.
-         */
-        [[nodiscard]] const char *what() const noexcept override;
-
-    private:
-        std::string m_Message; /** An error message holder. */
-    };
-
-    class parse_error : public exception
-    {
-    public:
-        /**
-         * @brief Construct a new parse_error object.
-         *
-         * @param message An error message.
-         */
-        explicit parse_error(const char *message) noexcept;
-
-        /**
-         * @brief Construct a new encoding_error object.
-         *
-         * @param msg An error message.
-         * @param mark The error position.
-         */
-        parse_error(const char *message, detail::mark mark) noexcept;
-
-    private:
-        /**
-         * @brief Generate an error message from the given parameters.
-         *
-         * This helper constructs a human-readable error message that
-         * includes the supplied @p message and positional information from
-         * @p mark (line, column, index). The returned C-string pointer is a
-         * pointer into an internal, thread-local buffer owned by the
-         * implementation. The pointer is valid until the next call to this
-         * function on the same thread. Callers (for example the
-         * exception constructors) should immediately copy the returned
-         * string if they need to retain it long-term.
-         *
-         * @param message An error message. May be nullptr.
-         * @param mark The error position.
-         *
-         * @return Pointer to a null-terminated C-string describing the error.
-         */
-        static const char *generate(const char *message, detail::mark mark) noexcept;
-    };
-
-    class encoding_error : public exception
-    {
-    public:
-        /**
-         * @brief Construct a new encoding_error object.
-         *
-         * @param message An error message.
-         */
-        explicit encoding_error(const char *message) noexcept;
-
-        /**
-         * @brief Construct a new encoding_error object.
-         *
-         * @param encoding The encoding.
-         * @param message An error message.
-         * @param data The Encoded character.
-         * @param size Number of bytes of data.
-         */
-        encoding_error(encoding encoding, const char *message, void *data, size_t size) noexcept;
-
-    private:
-        /**
-         * @brief Generate an error message from encoding-related parameters.
-         *
-         * Builds a human-readable message including the @p message, the
-         * detected @p encoding and a short hex representation of the
-         * problematic @p data (up to a small limit). The returned pointer
-         * points into an internal, thread-local buffer and is valid until
-         * the next call to this function on the same thread. Callers must
-         * copy the string if they need to keep it beyond the immediate use
-         * (the exception constructors copy it into their member storage).
-         *
-         * @param encoding The detected encoding for the data.
-         * @param message An error message. May be nullptr.
-         * @param data Pointer to the raw encoded character bytes, or nullptr.
-         * @param size Number of bytes available at @p data.
-         *
-         * @return Pointer to a null-terminated C-string describing the error.
-         */
-        static const char *generate(encoding encoding, const char *message, void *data, size_t size) noexcept;
-    };
-
-#endif // MYTOML_NO_EXCEPTIONS
-
     /**
      * @class mytoml::toml
      * @brief Lightweight value holder.
@@ -2224,21 +2636,533 @@ namespace mytoml
      */
     class toml
     {
-    public:
-        using table_t = std::map<std::string, toml>;
-        using array_t = std::vector<toml>;
-        using value_t = std::variant<std::nullptr_t, table_t, array_t, std::string, int64_t, double, bool>;
 
-        toml();
-        toml(table_t value);
-        toml(array_t value);
-        toml(std::string value);
+        friend ::mytoml::detail::serializer;
+        friend ::mytoml::detail::deserializer;
+        friend class ::mytoml::detail::parser;
+        friend class ::mytoml::detail::exception;
+
+        using initializer_list_t = std::initializer_list<toml>;
+
+    public:
+        using value_t = detail::value_t; /** A node value types. */
+
+        using value_type = toml;                    /** A toml object. */
+        using pointer = value_type *;               /** A pointer to a toml object. */
+        using reference = value_type &;             /** A reference to a toml object. */
+        using const_pointer = const value_type *;   /** A constant pointer to a toml object. */
+        using const_reference = const value_type &; /** A constant reference to a toml object. */
+        using difference_type = std::ptrdiff_t;     /** A differences between toml iterators. */
+        using size_type = std::size_t;              /** A type to represent toml sizes. */
+
+        /**
+         * @name types
+         * Type aliases for convenience.
+         * {@
+         */
+
+        using node_t = detail::value_t;              /** A type for a toml value. */
+        using table_t = std::map<std::string, toml>; /** A type for a toml object value. */
+        using array_t = std::vector<toml>;           /** A type for a toml array value. */
+        using string_t = std::string;                /** A type for a toml string value. */
+        using number_t = double;                     /** A type for a toml number value. */
+        using integer_t = int64_t;                   /** A type for a toml interger value. */
+        using boolean_t = bool;                      /** A type for a toml boolean value. */
+        using null_t = std::nullptr_t;               /** A type for a toml null value. */
+
+        /* @} types */
+
+        /**
+         * @name containers
+         * {@
+         */
+
+        using iterator = mytoml::detail::iterator<toml>;                                 /** An iterator type for toml. */
+        using const_iterator = mytoml::detail::iterator<const toml>;                     /** A const iterator type for toml. */
+        using reverse_iterator = mytoml::detail::reverse_iterator<iterator>;             /** A reverse iterator type for toml. */
+        using const_reverse_iterator = mytoml::detail::reverse_iterator<const_iterator>; /** A const reverse iterator type for toml. */
+
+        /* @} containers */
+
+        /**
+         * @name exceptions
+         * Classes to implement user-defined exceptions.
+         * {@
+         */
+
+        using exception = detail::exception;
+        using parse_error = detail::parse_error;
+        using encoding_error = detail::encoding_error;
+
+        /* @} exceptions */
+
+    public:
+        //========== Constructors ==========
+
+        // toml();
+        // toml(table_t value);
+        // toml(array_t value);
+        // toml(std::string value);
+        // toml(const char *value);
+        // toml(int64_t value);
+        // toml(double value);
+        // toml(bool value);
+
+        /**
+         * @brief Construct a TOML null value.
+         */
+        toml() noexcept;
+
+        /**
+         * @brief Construct TOML null explicitly.
+         */
+        toml(std::nullptr_t) noexcept;
+
+        /**
+         * @brief Construct a TOML boolean value.
+         */
+        toml(bool value) noexcept;
+
+        /**
+         * @brief Construct a TOML integer from int.
+         */
+        toml(int value) noexcept;
+
+        /**
+         * @brief Construct an empty value of the requested TOML type.
+         */
+        toml(value_t value) noexcept;
+
+        /**
+         * @brief Construct a TOML integer value.
+         */
+        toml(integer_t value) noexcept;
+
+        /**
+         * @brief Construct a TOML floating-point value.
+         */
+        toml(number_t value) noexcept;
+
+        /**
+         * @brief Construct a TOML string from a C string.
+         */
         toml(const char *value);
-        toml(int64_t value);
-        toml(double value);
-        toml(bool value);
+
+        /**
+         * @brief Construct a TOML string by copy.
+         */
+        toml(const string_t &value);
+
+        /**
+         * @brief Construct a TOML string by move.
+         */
+        toml(const string_t &&value);
+
+        /**
+         * @brief Construct a TOML array by copy.
+         */
+        toml(const array_t &value);
+
+        /**
+         * @brief Construct a TOML array by move.
+         */
+        toml(const array_t &&value);
+
+        /**
+         * @brief Construct a TOML object by copy.
+         */
+        toml(const table_t &value);
+
+        /**
+         * @brief Construct a TOML object by move.
+         */
+        toml(const table_t &&value);
+
+        /**
+         * @brief Copy constructor.
+         */
+        toml(const toml &other);
+
+        /**
+         * @brief Move constructor.
+         */
+        toml(toml &&other) noexcept;
+
+        /**
+         * @brief Construct from initializer-list.
+         * @param init Values to store.
+         * @param type_deduction Detect table-vs-array form from @p init.
+         * @param manual_type Explicitly force array or table type.
+         */
+        toml(initializer_list_t init,
+             bool type_deduction = true,
+             value_t manual_type = value_t::array);
+
+        /**
+         * @brief Create an array value from initializer-list.
+         */
+        static toml array(initializer_list_t init = {});
+
+        /**
+         * @brief Create a table value from initializer-list.
+         */
+        static toml table(initializer_list_t init = {});
+
+        //========== Assignment ==========
+
+        /**
+         * @brief Copy assignment.
+         */
+        reference operator=(const toml &other);
+
+        /**
+         * @brief Move assignment.
+         */
+        reference operator=(toml &&other) noexcept;
+
+        /**
+         * @brief Assign a null value.
+         */
+        reference operator=(std::nullptr_t) noexcept;
+
+        /**
+         * @brief Assign a boolean value.
+         */
+        reference operator=(bool value) noexcept;
+
+        /**
+         * @brief Assign a signed integer value.
+         */
+        reference operator=(int value) noexcept;
+
+        /**
+         * @brief Assign a 64-bit integer value.
+         */
+        reference operator=(integer_t value) noexcept;
+
+        /**
+         * @brief Assign a floating-point numeric value.
+         */
+        reference operator=(number_t value) noexcept;
+
+        /**
+         * @brief Assign a UTF-8 string value.
+         */
+        reference operator=(const string_t &value);
+
+        /**
+         * @brief Assign a C-string value (nullptr becomes empty string).
+         */
+        reference operator=(const char *value);
+
+        /**
+         * @brief Assign an array value.
+         */
+        reference operator=(const array_t &value);
+
+        /**
+         * @brief Assign an object value.
+         */
+        reference operator=(const table_t &value);
+
+        /**
+         * @brief Assign from initializer-list with type deduction.
+         */
+        reference operator=(initializer_list_t init);
 
         static toml parse(const std::string &text);
+
+        //========== Objects ==========
+
+        /**
+         * @brief Access table member by key with bounds checking.
+         */
+        reference at(const std::string &key);
+
+        /**
+         * @brief Access table member by key with bounds checking (const).
+         */
+        const_reference at(const std::string &key) const;
+
+        /**
+         * @brief Access/create table member by key.
+         */
+        reference operator[](const std::string &key);
+
+        /**
+         * @brief Access table member by key; returns null toml if missing.
+         */
+        toml operator[](const std::string &key) const;
+
+        /**
+         * @brief Access/create table member by C-string key.
+         */
+        reference operator[](const char *key);
+
+        /**
+         * @brief Access table member by C-string key; returns null toml if missing.
+         */
+        toml operator[](const char *key) const;
+
+        /**
+         * @brief Check whether an object contains @p key.
+         */
+        MYTOML_NODISCARD bool contains(const std::string &key) const noexcept;
+
+        /**
+         * @brief Count occurrences of @p key (0 or 1 for object).
+         */
+        MYTOML_NODISCARD size_t count(const std::string &key) const noexcept;
+
+        /**
+         * @brief Erase table member by key; returns removed count.
+         */
+        size_t erase(const std::string &key) noexcept;
+
+        //========== Arrays ==========
+
+        /**
+         * @brief Access array element with bounds checking.
+         */
+        reference &at(size_t index);
+
+        /**
+         * @brief Access array element with bounds checking (const).
+         */
+        const_reference at(size_t index) const;
+
+        /**
+         * @brief Access array element by index and grow with null values if needed.
+         */
+        reference operator[](size_t index);
+
+        /**
+         * @brief Access array element by index (const).
+         */
+        const_reference operator[](size_t index) const;
+
+        /**
+         * @brief Access first array element.
+         */
+        reference front();
+
+        /**
+         * @brief Access first array element (const).
+         */
+        const_reference front() const;
+
+        /**
+         * @brief Access last array element.
+         */
+        reference back();
+
+        /**
+         * @brief Access last array element (const).
+         */
+        const_reference back() const;
+
+        /**
+         * @brief Append element to array.
+         */
+        void push_back(const toml &value);
+
+        /**
+         * @brief Append movable element to array.
+         */
+        void push_back(toml &&value);
+
+        /**
+         * @brief Insert element at the front of an array.
+         */
+        void push_front(const toml &value);
+
+        /**
+         * @brief Insert value at iterator position.
+         */
+        iterator insert(const const_iterator &pos, const toml &value);
+
+        /**
+         * @brief Insert movable value at iterator position.
+         */
+        iterator insert(const const_iterator &pos, toml &&value);
+
+        /**
+         * @brief Erase one element at iterator position.
+         */
+        iterator erase(const_iterator pos);
+
+        /**
+         * @brief Erase range [first,last).
+         */
+        iterator erase(const_iterator first, const_iterator last);
+
+        //========== Iteration ==========
+
+        /**
+         * @brief Begin iterator over table members.
+         */
+        iterator begin();
+
+        /**
+         * @brief Begin const iterator over table members.
+         */
+        MYTOML_NODISCARD const_iterator begin() const;
+
+        /**
+         * @brief Constant begin iterator over table members.
+         */
+        MYTOML_NODISCARD const_iterator cbegin() const;
+
+        /**
+         * @brief End iterator over table members.
+         */
+        iterator end();
+
+        /**
+         * @brief End const iterator over table members.
+         */
+        MYTOML_NODISCARD const_iterator end() const;
+
+        /**
+         * @brief Constant end iterator over table members.
+         */
+        MYTOML_NODISCARD const_iterator cend() const;
+
+        /**
+         * @brief Reverse begin iterator over table members.
+         */
+        reverse_iterator rbegin();
+
+        /**
+         * @brief Reverse begin const iterator over table members.
+         */
+        MYTOML_NODISCARD const_reverse_iterator rbegin() const;
+
+        MYTOML_NODISCARD const_reverse_iterator crbegin() const;
+
+        /**
+         * @brief Reverse end iterator over table members.
+         */
+        reverse_iterator rend();
+
+        /**
+         * @brief Reverse end const iterator over table members.
+         */
+        MYTOML_NODISCARD const_reverse_iterator rend() const;
+
+        MYTOML_NODISCARD const_reverse_iterator crend() const;
+
+        //========== Comparison ==========
+
+        /** @brief Equality comparison. */
+        bool operator==(const toml &other) const noexcept;
+
+        /** @brief Inequality comparison. */
+        bool operator!=(const toml &other) const noexcept;
+
+        /** @brief Strict weak ordering comparison. */
+        bool operator<(const toml &other) const noexcept;
+
+        /** @brief Less-than-or-equal comparison. */
+        bool operator<=(const toml &other) const noexcept;
+
+        /** @brief Greater-than comparison. */
+        bool operator>(const toml &other) const noexcept;
+
+        /** @brief Greater-than-or-equal comparison. */
+        bool operator>=(const toml &other) const noexcept;
+
+        /**
+         * @name serialization
+         * {@
+         */
+
+        /**
+         * @brief Serialize to TOML text (compact or pretty with indent).
+         */
+        MYTOML_NODISCARD string_t dump(int indent = -1) const;
+
+        /**
+         * @brief Serialize with default pretty indentation.
+         */
+        MYTOML_NODISCARD string_t dump_pretty() const;
+
+        /**
+         * @brief Serialize in compact form.
+         */
+        MYTOML_NODISCARD string_t dump_compact() const;
+
+        static void dump(FILE *file);
+
+        static void dump(const char *str);
+
+        static void dump(const string_t &str);
+
+#ifndef MYTOML_NO_STL
+        static void dump(std::ostream &stream);
+#endif // MYTOML_NO_STL
+
+        static void dump(detail::oadapter &adapter);
+
+#ifndef MYTOML_NO_IO
+        friend std::ostream &operator<<(std::ostream &o, const toml &j);
+#endif // MYTOML_NO_IO
+
+        /* @} serialization */
+
+        /**
+         * @name deserialization
+         * @brief Parsing
+         * {@
+         */
+
+        /**
+         * @brief Parse TOML from FILE.
+         * @param file The TOML FILE* to parse.
+         * @return Parsed toml object.
+         * @throws parse_error on invalid TOML.
+         */
+        static toml parse(FILE *file);
+
+        /**
+         * @brief Parse TOML from C string.
+         * @param str The TOML string to parse.
+         * @return Parsed toml object.
+         * @throws parse_error on invalid TOML.
+         */
+        static toml parse(const char *str);
+
+        /**
+         * @brief Parse TOML from string.
+         * @param str The TOML string to parse.
+         * @return Parsed toml object.
+         * @throws parse_error on invalid TOML.
+         */
+        static toml parse(const string_t &str);
+
+#ifndef MYTOML_NO_STL
+        /**
+         * @brief Parse TOML from an input stream.
+         * @param stream The TOML input stream to parse.
+         * @return Parsed toml object.
+         * @throws parse_error on invalid TOML.
+         */
+        static toml parse(std::istream &stream);
+#endif // MYTOML_NO_STL
+
+        /**
+         * @brief Parse TOML from an input adapter.
+         * @param adapter The TOML input adapter to parse.
+         * @return Parsed toml object.
+         * @throws parse_error on invalid TOML.
+         */
+        static toml parse(detail::iadapter &adapter);
+
+#ifndef MYTOML_NO_IO
+        friend std::istream &operator>>(std::istream &i, const toml &j);
+#endif // MYTOML_NO_IO
+
+        /* @} deserialization */
 
         node_t type() const noexcept;
         bool is_table() const noexcept;
@@ -2260,8 +3184,51 @@ namespace mytoml
 
         std::string dump(int indent = 0) const;
 
+        //========== Size and Capacity ==========
+
+        /**
+         * @brief Return number of elements for array/table, otherwise 0.
+         */
+        MYTOML_NODISCARD size_type size() const noexcept;
+
+        /**
+         * @brief Return whether container size is zero.
+         */
+        MYTOML_NODISCARD bool empty() const noexcept;
+
+        /**
+         * @brief Clear table/array contents.
+         */
+        void clear() noexcept;
+
+        /**
+         * @brief Default destructor.
+         */
+        ~toml() noexcept;
+
     private:
-        value_t m_value;
+        void ensure_table();
+
+        void ensure_array();
+
+        MYTOML_NODISCARD const table_t &get_table() const;
+
+        MYTOML_NODISCARD const array_t &get_array() const;
+
+        table_t &get_table();
+
+        array_t &get_array();
+
+    private:
+        std::variant<
+            null_t,
+            boolean_t,
+            integer_t,
+            number_t,
+            string_t,
+            array_t,
+            table_t>
+            m_value; /** Active TOML storage variant. */
     };
 
     /** @} */
@@ -2394,7 +3361,6 @@ namespace mytoml
     MYTOML_VERSION_NAMESPACE_END
 
 }; // namespace mytoml
-
 #pragma endregion // Literal
 
 //-----------------------------------------------------------------------------
