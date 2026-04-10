@@ -154,6 +154,7 @@
 
 #include <exception>
 #include <functional>
+#include <memory>
 #include <ostream>
 #include <istream>
 #include <string>
@@ -166,7 +167,6 @@
 // #include <uchar.h> // char16_t, char32_t
 #include <string.h>
 #include <stdlib.h>
-#include <stdbool.h>
 
 #include <iostream>
 
@@ -1019,7 +1019,14 @@ namespace mytoml
             string,  ///< string value
             number,  ///< numeric value (floating point)
             integer, ///< integer value
-            boolean  ///< boolean value
+            boolean, ///< boolean value
+
+            empty,
+            floating,
+            offset_datetime,
+            local_datetime,
+            local_date,
+            local_time,
 
         };
 
@@ -1184,7 +1191,7 @@ namespace mytoml
              * @param data The Encoded character.
              * @param size Number of bytes of data.
              */
-            encoding_error(encoding encoding, const char *message, void *data, size_t size) noexcept;
+            encoding_error(encoding encoding_type, const char *message, void *data, size_t size) noexcept;
 
         private:
             /**
@@ -2870,8 +2877,6 @@ namespace mytoml
          */
         reference operator=(initializer_list_t init);
 
-        static toml parse(const std::string &text);
-
         //========== Objects ==========
 
         /**
@@ -2924,7 +2929,7 @@ namespace mytoml
         /**
          * @brief Access array element with bounds checking.
          */
-        reference &at(size_t index);
+        reference at(size_t index);
 
         /**
          * @brief Access array element with bounds checking (const).
@@ -3092,17 +3097,17 @@ namespace mytoml
          */
         MYTOML_NODISCARD string_t dump_compact() const;
 
-        static void dump(FILE *file);
+        void dump(FILE *file);
 
-        static void dump(const char *str);
+        void dump(const char *str);
 
-        static void dump(const string_t &str);
+        void dump(const string_t &str);
 
 #ifndef MYTOML_NO_STL
-        static void dump(std::ostream &stream);
+        void dump(std::ostream &stream);
 #endif // MYTOML_NO_STL
 
-        static void dump(detail::oadapter &adapter);
+        void dump(detail::oadapter &adapter);
 
 #ifndef MYTOML_NO_IO
         friend std::ostream &operator<<(std::ostream &o, const toml &j);
@@ -3159,18 +3164,18 @@ namespace mytoml
         static toml parse(detail::iadapter &adapter);
 
 #ifndef MYTOML_NO_IO
-        friend std::istream &operator>>(std::istream &i, const toml &j);
+        friend std::istream &operator>>(std::istream &i, toml &j);
 #endif // MYTOML_NO_IO
 
         /* @} deserialization */
 
-        node_t type() const noexcept;
-        bool is_table() const noexcept;
-        bool is_array() const noexcept;
-        bool is_string() const noexcept;
-        bool is_integer() const noexcept;
-        bool is_floating() const noexcept;
-        bool is_boolean() const noexcept;
+        MYTOML_NODISCARD node_t type() const noexcept;
+        MYTOML_NODISCARD bool is_table() const noexcept;
+        MYTOML_NODISCARD bool is_array() const noexcept;
+        MYTOML_NODISCARD bool is_string() const noexcept;
+        MYTOML_NODISCARD bool is_integer() const noexcept;
+        MYTOML_NODISCARD bool is_floating() const noexcept;
+        MYTOML_NODISCARD bool is_boolean() const noexcept;
 
         table_t &as_table();
         const table_t &as_table() const;
@@ -3181,8 +3186,6 @@ namespace mytoml
         int64_t as_integer() const;
         double as_floating() const;
         bool as_boolean() const;
-
-        std::string dump(int indent = 0) const;
 
         //========== Size and Capacity ==========
 
@@ -3226,8 +3229,8 @@ namespace mytoml
             integer_t,
             number_t,
             string_t,
-            array_t,
-            table_t>
+            std::shared_ptr<array_t>,
+            std::shared_ptr<table_t>>
             m_value; /** Active TOML storage variant. */
     };
 
@@ -3273,7 +3276,7 @@ namespace mytoml
      * @param[in] node A toml object.
      * @return Reference to the input stream object `stream`.
      */
-    std::istream &operator>>(std::istream &stream, const toml &node);
+    std::istream &operator>>(std::istream &stream, toml &node);
 
 #endif // MYTOML_NO_STL
 

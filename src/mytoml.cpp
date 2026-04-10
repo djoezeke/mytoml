@@ -176,8 +176,8 @@ namespace mytoml
         encoding_error::encoding_error(const char *message) noexcept
             : exception(generate(encoding::unspecified, message, nullptr, 0)) {};
 
-        encoding_error::encoding_error(encoding encoding, const char *message, void *data, size_t size) noexcept
-            : exception(generate(encoding, message, data, size)) {};
+        encoding_error::encoding_error(encoding encoding_type, const char *message, void *data, size_t size) noexcept
+            : exception(generate(encoding_type, message, data, size)) {};
 
         const char *encoding_error::generate(encoding enc, const char *message, void *data, size_t size) noexcept
         {
@@ -439,6 +439,7 @@ namespace mytoml
                 char tmp[4];
                 int enc = utf32::encode(cp, reinterpret_cast<utf32::char_t *>(tmp), sizeof(tmp), order);
                 MYTOML_ASSERT(enc > 0);
+                (void)enc;
                 for (int i = 0; i < 4; ++i)
                     out.push_back(static_cast<unsigned char>(tmp[i]));
                 idx += static_cast<size_t>(dec);
@@ -667,6 +668,7 @@ namespace mytoml
                 unsigned int cp = 0;
                 int dec = utf32::decode(reinterpret_cast<const char *>(bytes.data() + idx), bytes.size() - idx, cp, order);
                 MYTOML_ASSERT(dec == 4);
+                (void)dec;
                 char tmp[4];
                 int enc = utf8::encode(cp, reinterpret_cast<utf8::char_t *>(tmp), sizeof(tmp));
                 MYTOML_ASSERT(enc > 0);
@@ -1843,11 +1845,23 @@ namespace mytoml
             }
         };
 
-        const char *string(mark type) { return ""; };
+        const char *string(mark type)
+        {
+            (void)type;
+            return "mark";
+        };
 
-        const char *string(event type) { return ""; };
+        const char *string(event type)
+        {
+            (void)type;
+            return "event";
+        };
 
-        const char *string(token type) { return ""; };
+        const char *string(token type)
+        {
+            (void)type;
+            return "token";
+        };
 
 #ifndef MYTOML_NO_STL
 
@@ -1933,8 +1947,8 @@ namespace mytoml
     // - operator<<()
     //-----------------------------------------------------------------------------
 
-    version::version(int major, int minor, int patch)
-        : major(major), minor(minor), patch(patch)
+    version::version(int major_value, int minor_value, int patch_value)
+        : major(major_value), minor(minor_value), patch(patch_value)
     {
     }
 
@@ -1997,6 +2011,9 @@ namespace mytoml
     {
         switch (value)
         {
+        case value_t::unknown:
+            m_value = nullptr;
+            break;
         case value_t::null:
             m_value = nullptr;
             break;
@@ -2006,17 +2023,25 @@ namespace mytoml
         case value_t::integer:
             m_value = static_cast<integer_t>(0);
             break;
+        case value_t::floating:
         case value_t::number:
             m_value = static_cast<number_t>(0.0);
             break;
+        case value_t::empty:
         case value_t::string:
             m_value = string_t();
             break;
         case value_t::array:
-            m_value = array_t();
+            m_value = std::make_shared<array_t>();
             break;
         case value_t::table:
-            m_value = table_t();
+            m_value = std::make_shared<table_t>();
+            break;
+        case value_t::offset_datetime:
+        case value_t::local_datetime:
+        case value_t::local_date:
+        case value_t::local_time:
+            m_value = string_t();
             break;
         }
     }
@@ -2047,22 +2072,22 @@ namespace mytoml
     }
 
     toml::toml(const array_t &value)
-        : m_value(value)
+        : m_value(std::make_shared<array_t>(value))
     {
     }
 
     toml::toml(const array_t &&value)
-        : m_value(std::move(value))
+        : m_value(std::make_shared<array_t>(std::move(value)))
     {
     }
 
     toml::toml(const table_t &value)
-        : m_value(value)
+        : m_value(std::make_shared<table_t>(value))
     {
     }
 
     toml::toml(const table_t &&value)
-        : m_value(std::move(value))
+        : m_value(std::make_shared<table_t>(std::move(value)))
     {
     }
 
@@ -2094,7 +2119,7 @@ namespace mytoml
             {
                 object[element[static_cast<size_t>(0)].as_string()] = element[static_cast<size_t>(1)];
             }
-            m_value = std::move(object);
+            m_value = std::make_shared<table_t>(std::move(object));
             return;
         }
 
@@ -2104,10 +2129,45 @@ namespace mytoml
         {
             array.push_back(element);
         }
-        m_value = std::move(array);
+        m_value = std::make_shared<array_t>(std::move(array));
     }
 
-    toml::toml(const toml &other) = default;
+    toml::toml(const toml &other)
+    {
+        switch (other.type())
+        {
+        case value_t::null:
+        case value_t::unknown:
+            m_value = nullptr;
+            break;
+        case value_t::boolean:
+            m_value = other.as_boolean();
+            break;
+        case value_t::integer:
+            m_value = other.as_integer();
+            break;
+        case value_t::number:
+        case value_t::floating:
+            m_value = other.as_floating();
+            break;
+        case value_t::string:
+        case value_t::offset_datetime:
+        case value_t::local_datetime:
+        case value_t::local_date:
+        case value_t::local_time:
+            m_value = other.as_string();
+            break;
+        case value_t::array:
+            m_value = std::make_shared<array_t>(other.as_array());
+            break;
+        case value_t::table:
+            m_value = std::make_shared<table_t>(other.as_table());
+            break;
+        case value_t::empty:
+            m_value = string_t();
+            break;
+        }
+    }
     toml::toml(toml &&other) noexcept = default;
 
     toml toml::table(initializer_list_t init)
@@ -2125,41 +2185,41 @@ namespace mytoml
     void toml::ensure_table()
     {
         if (!is_table())
-            m_value = table_t();
+            m_value = std::make_shared<table_t>();
     }
 
     void toml::ensure_array()
     {
         if (!is_array())
-            m_value = array_t();
+            m_value = std::make_shared<array_t>();
     }
 
     const toml::table_t &toml::get_table() const
     {
         if (!is_table())
             MYTOML_THROW(std::runtime_error("Cannot access as object"));
-        return std::get<table_t>(m_value);
+        return *std::get<std::shared_ptr<table_t>>(m_value);
     }
 
     const toml::array_t &toml::get_array() const
     {
         if (!is_array())
             MYTOML_THROW(std::runtime_error("Cannot access as array"));
-        return std::get<array_t>(m_value);
+        return *std::get<std::shared_ptr<array_t>>(m_value);
     }
 
     toml::table_t &toml::get_table()
     {
         if (!is_table())
             MYTOML_THROW(std::runtime_error("Cannot access as object"));
-        return std::get<table_t>(m_value);
+        return *std::get<std::shared_ptr<table_t>>(m_value);
     }
 
     toml::array_t &toml::get_array()
     {
         if (!is_array())
             MYTOML_THROW(std::runtime_error("Cannot access as array"));
-        return std::get<array_t>(m_value);
+        return *std::get<std::shared_ptr<array_t>>(m_value);
     }
 
     //========== Container Access (Objects) ==========
@@ -2317,9 +2377,150 @@ namespace mytoml
             get_array().clear();
     }
 
+    //========== Iteration ==========
+
+    toml::iterator toml::begin()
+    {
+        if (is_table())
+        {
+            return iterator(get_table().begin());
+        }
+        if (is_array())
+        {
+            return iterator(get_array().begin());
+        }
+        return iterator(typename table_t::iterator{});
+    }
+
+    toml::const_iterator toml::begin() const { return cbegin(); }
+
+    toml::const_iterator toml::cbegin() const
+    {
+        if (is_table())
+        {
+            return const_iterator(get_table().cbegin());
+        }
+        if (is_array())
+        {
+            return const_iterator(get_array().cbegin());
+        }
+        return const_iterator(typename table_t::const_iterator{});
+    }
+
+    toml::iterator toml::end()
+    {
+        if (is_table())
+        {
+            return iterator(get_table().end());
+        }
+        if (is_array())
+        {
+            return iterator(get_array().end());
+        }
+        return iterator(typename table_t::iterator{});
+    }
+
+    toml::const_iterator toml::end() const { return cend(); }
+    toml::const_iterator toml::cend() const
+    {
+        if (is_table())
+        {
+            return const_iterator(get_table().cend());
+        }
+        if (is_array())
+        {
+            return const_iterator(get_array().cend());
+        }
+        return const_iterator(typename table_t::const_iterator{});
+    }
+
+    toml::reverse_iterator toml::rbegin() { return reverse_iterator(end()); }
+    toml::const_reverse_iterator toml::rbegin() const { return crbegin(); };
+    toml::const_reverse_iterator toml::crbegin() const { return const_reverse_iterator(cend()); }
+    toml::reverse_iterator toml::rend() { return reverse_iterator(begin()); }
+    toml::const_reverse_iterator toml::rend() const { return crend(); }
+    toml::const_reverse_iterator toml::crend() const { return const_reverse_iterator(cbegin()); }
+
+    //========== Comparison ==========
+
+    bool toml::operator==(const toml &other) const noexcept
+    {
+        if (type() != other.type())
+            return false;
+
+        switch (type())
+        {
+        case value_t::null:
+        case value_t::unknown:
+            return true;
+        case value_t::boolean:
+            return as_boolean() == other.as_boolean();
+        case value_t::integer:
+            return as_integer() == other.as_integer();
+        case value_t::number:
+        case value_t::floating:
+            return as_floating() == other.as_floating();
+        case value_t::string:
+        case value_t::offset_datetime:
+        case value_t::local_datetime:
+        case value_t::local_date:
+        case value_t::local_time:
+            return as_string() == other.as_string();
+        case value_t::array:
+            return get_array() == other.get_array();
+        case value_t::table:
+            return get_table() == other.get_table();
+        case value_t::empty:
+            return true;
+        }
+
+        return false;
+    }
+    bool toml::operator!=(const toml &other) const noexcept { return !(*this == other); }
+    bool toml::operator<(const toml &other) const noexcept
+    {
+        if (type() != other.type())
+            return static_cast<uint8_t>(type()) < static_cast<uint8_t>(other.type());
+
+        switch (type())
+        {
+        case value_t::null:
+            return false;
+        case value_t::boolean:
+            return as_boolean() < other.as_boolean();
+        case value_t::integer:
+            return as_integer() < other.as_integer();
+        case value_t::number:
+        case value_t::floating:
+            return as_floating() < other.as_floating();
+        case value_t::string:
+        case value_t::offset_datetime:
+        case value_t::local_datetime:
+        case value_t::local_date:
+        case value_t::local_time:
+            return as_string() < other.as_string();
+        case value_t::array:
+            return get_array() < other.get_array();
+        case value_t::table:
+            return get_table() < other.get_table();
+        default:
+            return false;
+        }
+    }
+    bool toml::operator<=(const toml &other) const noexcept { return (*this < other) || (*this == other); }
+    bool toml::operator>(const toml &other) const noexcept { return other < *this; }
+    bool toml::operator>=(const toml &other) const noexcept { return !(*this < other); }
+
     //========== Assignment ==========
 
-    toml &toml::operator=(const toml &other) = default;
+    toml &toml::operator=(const toml &other)
+    {
+        if (this != &other)
+        {
+            *this = toml(other);
+        }
+        return *this;
+    }
     toml &toml::operator=(toml &&other) noexcept = default;
 
     toml &toml::operator=(std::nullptr_t) noexcept
@@ -2366,13 +2567,13 @@ namespace mytoml
 
     toml &toml::operator=(const array_t &value)
     {
-        m_value = value;
+        m_value = std::make_shared<array_t>(value);
         return *this;
     }
 
     toml &toml::operator=(const table_t &value)
     {
-        m_value = value;
+        m_value = std::make_shared<table_t>(value);
         return *this;
     }
 
@@ -2661,27 +2862,60 @@ namespace mytoml
         return toml{root};
     }
 
-    toml::value_t toml::type() const noexcept
+    toml toml::parse(FILE *file)
     {
-        switch (m_value.index())
+        if (file == nullptr)
+            MYTOML_THROW(parse_error("Null file pointer passed to parse"));
+
+        std::ostringstream buffer;
+        char chunk[4096];
+        while (true)
         {
-        case 0:
-            return value_t::null;
-        case 1:
-            return value_t::boolean;
-        case 2:
-            return value_t::integer;
-        case 3:
-            return value_t::number;
-        case 4:
-            return value_t::string;
-        case 5:
-            return value_t::array;
-        case 6:
-            return value_t::table;
-        default:
-            return value_t::null;
+            const size_t n = std::fread(chunk, 1, sizeof(chunk), file);
+            if (n > 0)
+                buffer.write(chunk, static_cast<std::streamsize>(n));
+            if (n < sizeof(chunk))
+            {
+                if (std::feof(file) != 0)
+                    break;
+                if (std::ferror(file) != 0)
+                    MYTOML_THROW(parse_error("Failed reading file in parse"));
+            }
         }
+        return parse(buffer.str());
+    }
+
+    toml toml::parse(const char *str)
+    {
+        if (str == nullptr)
+            MYTOML_THROW(parse_error("Null pointer passed to parse"));
+
+        return parse(string_t(str));
+    }
+
+#ifndef MYTOML_NO_STL
+    toml toml::parse(std::istream &stream)
+    {
+        std::ostringstream buffer;
+        buffer << stream.rdbuf();
+        return parse(buffer.str());
+    }
+#endif // MYTOML_NO_STL
+
+    toml toml::parse(detail::iadapter &adapter)
+    {
+        std::string input;
+        char chunk[4096];
+        while (true)
+        {
+            const size_t n = adapter.read(chunk, sizeof(chunk));
+            if (n == 0)
+                break;
+            input.append(chunk, n);
+            if (n < sizeof(chunk))
+                break;
+        }
+        return parse(input);
     }
 
     bool toml::is_table() const noexcept { return type() == node_t::table; }
@@ -2691,10 +2925,10 @@ namespace mytoml
     bool toml::is_floating() const noexcept { return type() == node_t::number; }
     bool toml::is_boolean() const noexcept { return type() == node_t::boolean; }
 
-    toml::table_t &toml::as_table() { return std::get<table_t>(m_value); }
-    const toml::table_t &toml::as_table() const { return std::get<table_t>(m_value); }
-    toml::array_t &toml::as_array() { return std::get<array_t>(m_value); }
-    const toml::array_t &toml::as_array() const { return std::get<array_t>(m_value); }
+    toml::table_t &toml::as_table() { return *std::get<std::shared_ptr<table_t>>(m_value); }
+    const toml::table_t &toml::as_table() const { return *std::get<std::shared_ptr<table_t>>(m_value); }
+    toml::array_t &toml::as_array() { return *std::get<std::shared_ptr<array_t>>(m_value); }
+    const toml::array_t &toml::as_array() const { return *std::get<std::shared_ptr<array_t>>(m_value); }
     std::string &toml::as_string() { return std::get<std::string>(m_value); }
     const std::string &toml::as_string() const { return std::get<std::string>(m_value); }
     int64_t toml::as_integer() const { return std::get<int64_t>(m_value); }
@@ -2705,6 +2939,8 @@ namespace mytoml
         return static_cast<double>(std::get<int64_t>(m_value));
     }
     bool toml::as_boolean() const { return std::get<bool>(m_value); }
+
+    //========== Serialization ==========
 
     namespace
     {
@@ -2801,6 +3037,61 @@ namespace mytoml
         return out.str();
     };
 
+    std::string toml::dump_pretty() const { return dump(2); }
+    std::string toml::dump_compact() const { return dump(-1); }
+
+    void toml::dump(FILE *file)
+    {
+        if (file == nullptr)
+            MYTOML_THROW(parse_error("Null file pointer passed to dump"));
+
+        const auto text = dump_compact();
+        const auto written = std::fwrite(text.data(), 1, text.size(), file);
+        if (written != text.size())
+            MYTOML_THROW(parse_error("Failed writing file in dump"));
+    };
+
+    void toml::dump(const char *str)
+    {
+        if (str == nullptr)
+            MYTOML_THROW(parse_error("Null path passed to dump"));
+
+        FILE *file = std::fopen(str, "wb");
+        if (file == nullptr)
+            MYTOML_THROW(parse_error("Failed opening output file in dump"));
+
+        MYTOML_TRY
+        {
+            dump(file);
+            std::fclose(file);
+        }
+        MYTOML_CATCH(...)
+        {
+            std::fclose(file);
+            MYTOML_THROW(parse_error("Failed writing output file in dump"));
+        }
+    };
+
+    void toml::dump(const string_t &str)
+    {
+        dump(str.c_str());
+    };
+
+#ifndef MYTOML_NO_STL
+    void toml::dump(std::ostream &stream)
+    {
+        stream << dump();
+    };
+#endif // MYTOML_NO_STL
+
+    void toml::dump(detail::oadapter &adapter)
+    {
+        const auto text = dump_compact();
+        adapter.write(text.data(), text.size());
+    };
+
+    toml::~toml() noexcept = default;
+
     //-----------------------------------------------------------------------------
     // [SECTION] Mytoml : Functions
     //-----------------------------------------------------------------------------
@@ -2835,7 +3126,25 @@ namespace mytoml
 
     const char *string(node_t type)
     {
-        return "";
+        switch (type)
+        {
+        case node_t::unknown:
+            return "unknown";
+        case node_t::table:
+            return "table";
+        case node_t::array:
+            return "array";
+        case node_t::string:
+            return "string";
+        case node_t::integer:
+            return "integer";
+        case node_t::floating:
+            return "floating";
+        case node_t::boolean:
+            return "boolean";
+        default:
+            return "unknown";
+        }
     };
 
     std::ostream &operator<<(std::ostream &stream, const encoding &type)
@@ -2862,11 +3171,7 @@ namespace mytoml
 
     std::istream &operator>>(std::istream &stream, toml &node)
     {
-        // node = toml::parse(stream);
-
-        std::ostringstream buffer;
-        buffer << stream.rdbuf();
-        const_cast<toml &>(node) = toml::parse(buffer.str());
+        node = toml::parse(stream);
         return stream;
     };
 
