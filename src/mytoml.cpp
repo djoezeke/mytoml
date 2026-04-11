@@ -1995,17 +1995,17 @@ namespace mytoml
     toml::toml(std::nullptr_t) noexcept
         : m_value(nullptr)
     {
-    }
+    };
 
     toml::toml(bool value) noexcept
         : m_value(value)
     {
-    }
+    };
 
     toml::toml(int value) noexcept
         : m_value(static_cast<integer_t>(value))
     {
-    }
+    };
 
     toml::toml(value_t value) noexcept
     {
@@ -2044,52 +2044,52 @@ namespace mytoml
             m_value = string_t();
             break;
         }
-    }
+    };
 
     toml::toml(integer_t value) noexcept
         : m_value(value)
     {
-    }
+    };
 
     toml::toml(number_t value) noexcept
         : m_value(value)
     {
-    }
+    };
 
     toml::toml(const char *value)
         : m_value(string_t(value != nullptr ? value : ""))
     {
-    }
+    };
 
     toml::toml(const string_t &value)
         : m_value(value)
     {
-    }
+    };
 
     toml::toml(const string_t &&value)
         : m_value(std::move(value))
     {
-    }
+    };
 
     toml::toml(const array_t &value)
         : m_value(std::make_shared<array_t>(value))
     {
-    }
+    };
 
     toml::toml(const array_t &&value)
         : m_value(std::make_shared<array_t>(std::move(value)))
     {
-    }
+    };
 
     toml::toml(const table_t &value)
         : m_value(std::make_shared<table_t>(value))
     {
-    }
+    };
 
     toml::toml(const table_t &&value)
         : m_value(std::make_shared<table_t>(std::move(value)))
     {
-    }
+    };
 
     toml::toml(toml::initializer_list_t init, bool type_deduction, toml::value_t manual_type)
     {
@@ -2130,7 +2130,7 @@ namespace mytoml
             array.push_back(element);
         }
         m_value = std::make_shared<array_t>(std::move(array));
-    }
+    };
 
     toml::toml(const toml &other)
     {
@@ -2167,18 +2167,19 @@ namespace mytoml
             m_value = string_t();
             break;
         }
-    }
+    };
+
     toml::toml(toml &&other) noexcept = default;
 
     toml toml::table(initializer_list_t init)
     {
         return toml(init, false, value_t::table);
-    }
+    };
 
     toml toml::array(initializer_list_t init)
     {
         return toml(init, false, value_t::array);
-    }
+    };
 
     //========== Helper Methods ==========
 
@@ -3037,15 +3038,12 @@ namespace mytoml
         return out.str();
     };
 
-    std::string toml::dump_pretty() const { return dump(2); }
-    std::string toml::dump_compact() const { return dump(-1); }
-
     void toml::dump(FILE *file)
     {
         if (file == nullptr)
             MYTOML_THROW(parse_error("Null file pointer passed to dump"));
 
-        const auto text = dump_compact();
+        const auto text = dump();
         const auto written = std::fwrite(text.data(), 1, text.size(), file);
         if (written != text.size())
             MYTOML_THROW(parse_error("Failed writing file in dump"));
@@ -3086,7 +3084,7 @@ namespace mytoml
 
     void toml::dump(detail::oadapter &adapter)
     {
-        const auto text = dump_compact();
+        const auto text = dump();
         adapter.write(text.data(), text.size());
     };
 

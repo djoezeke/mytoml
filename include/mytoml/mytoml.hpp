@@ -2167,8 +2167,91 @@ namespace mytoml
             int m_char;
         };
 
+        /**
+         * @class parser
+         * @brief Recursive-descent TOML parser over a token stream.
+         *
+         * The parser consumes tokens from @ref lexer and materializes
+         * a @ref mytoml::toml value.
+         */
+        class parser
+        {
+        public:
+            /**
+             * @brief Construct a parser from a lexer instance.
+             * @param lexer Lexer producing TOML tokens.
+             */
+            explicit parser(class lexer *lexer);
+
+            /**
+             * @brief Deleted copy constructor.
+             */
+            parser(const parser &) = delete;
+
+            /**
+             * @brief Deleted move constructor.
+             */
+            parser(parser &&) = delete;
+
+            /**
+             * @brief Deleted copy assignment operator.
+             */
+            parser &operator=(const parser &) = delete;
+
+            /**
+             * @brief Deleted move assignment operator.
+             */
+            parser &operator=(parser &&) = delete;
+
+            /**
+             * @brief Parse one complete TOML value.
+             * @return Parsed TOML value.
+             */
+            MYTOML_NODISCARD mytoml::toml parse();
+
+        private:
+            MYTOML_NODISCARD mytoml::toml parse_comment();
+            MYTOML_NODISCARD mytoml::toml parse_boolean();
+            MYTOML_NODISCARD mytoml::toml parse_floating();
+            MYTOML_NODISCARD mytoml::toml parse_local_date();
+            MYTOML_NODISCARD mytoml::toml parse_local_time();
+            MYTOML_NODISCARD mytoml::toml parse_local_datetime();
+            MYTOML_NODISCARD mytoml::toml parse_offset_datetime();
+            MYTOML_NODISCARD mytoml::toml parse_local_datetime();
+            MYTOML_NODISCARD mytoml::toml parse_null();
+            MYTOML_NODISCARD mytoml::toml parse_key();
+            MYTOML_NODISCARD mytoml::toml parse_value();
+            MYTOML_NODISCARD mytoml::toml parse_array();
+            MYTOML_NODISCARD mytoml::toml parse_table();
+            MYTOML_NODISCARD mytoml::toml parse_table_key();
+            MYTOML_NODISCARD mytoml::toml parse_simple_key();
+            MYTOML_NODISCARD mytoml::toml parse_number(const std::string &text);
+            MYTOML_NODISCARD std::string parse_string(const std::string &text);
+            void advance();
+
+        private:
+            lexer *m_lexer{nullptr};
+            token m_current{};
+        };
+
         class deserializer
         {
+        public:
+            using value_type = toml;
+
+            using key_type = std::string;
+            using comment_type = std::string;
+            using boolean_type = bool;
+            using integer_type = int64_t;
+            using floating_type = double;
+            using string_type = std::string;
+            using local_time_type = local_time;
+            using local_date_type = local_date;
+            using local_datetime_type = local_datetime;
+            using offset_datetime_type = offset_datetime;
+            using array_type = std::vector<toml>;
+            using table_type = std::map<std::string, toml>;
+
         public:
             /**
              * @brief Deleted copy constructor
@@ -2403,6 +2486,24 @@ namespace mytoml
         class serializer
         {
         public:
+            using value_type = toml;
+
+            using key_type = typename value_type::key_type;
+            using comment_type = typename value_type::comment_type;
+            using boolean_type = typename value_type::boolean_type;
+            using integer_type = typename value_type::integer_type;
+            using floating_type = typename value_type::floating_type;
+            using string_type = typename value_type::string_type;
+            using local_time_type = typename value_type::local_time_type;
+            using local_date_type = typename value_type::local_date_type;
+            using local_datetime_type = typename value_type::local_datetime_type;
+            using offset_datetime_type = typename value_type::offset_datetime_type;
+            using array_type = typename value_type::array_type;
+            using table_type = typename value_type::table_type;
+
+            using char_type = typename string_type::value_type;
+
+        public:
             /**
              * @brief Deleted copy constructor
              */
@@ -2633,6 +2734,58 @@ namespace mytoml
 
 #endif // MYTOML_NO_STL
 
+    enum class month_t : uint8_t
+    {
+        Jan = 0,
+        Feb = 1,
+        Mar = 2,
+        Apr = 3,
+        May = 4,
+        Jun = 5,
+        Jul = 6,
+        Aug = 7,
+        Sep = 8,
+        Oct = 9,
+        Nov = 10,
+        Dec = 11
+    };
+
+    struct local_date
+    {
+        uint16_t year{0}; // A.D. (like, 2018)
+        uint8_t month{0}; // [0, 11]
+        uint8_t day{0};   // [1, 31]
+    };
+
+    struct local_time
+    {
+        uint8_t hour{0};         // [0, 23]
+        uint8_t minute{0};       // [0, 59]
+        uint8_t second{0};       // [0, 60]
+        uint16_t millisecond{0}; // [0, 999]
+        uint16_t microsecond{0}; // [0, 999]
+        uint16_t nanosecond{0};  // [0, 999]
+    };
+
+    struct time_offset
+    {
+        uint8_t hour{0};   // [-12, 12]
+        uint8_t minute{0}; // [-59, 59]
+    };
+
+    struct local_datetime
+    {
+        local_date date{};
+        local_time time{};
+    };
+
+    struct offset_datetime
+    {
+        local_date date{};
+        local_time time{};
+        time_offset offset{};
+    };
+
     /**
      * @class mytoml::toml
      * @brief Lightweight value holder.
@@ -2660,7 +2813,7 @@ namespace mytoml
         using const_pointer = const value_type *;   /** A constant pointer to a toml object. */
         using const_reference = const value_type &; /** A constant reference to a toml object. */
         using difference_type = std::ptrdiff_t;     /** A differences between toml iterators. */
-        using size_type = std::size_t;              /** A type to represent toml sizes. */
+        using size_type = size_t;                   /** A type to represent toml sizes. */
 
         /**
          * @name types
@@ -2676,6 +2829,19 @@ namespace mytoml
         using integer_t = int64_t;                   /** A type for a toml interger value. */
         using boolean_t = bool;                      /** A type for a toml boolean value. */
         using null_t = std::nullptr_t;               /** A type for a toml null value. */
+
+        using key_type = std::string;
+        using comment_type = std::string;
+        using boolean_type = bool;
+        using integer_type = int64_t;
+        using floating_type = double;
+        using string_type = std::string;
+        using local_time_type = local_time;
+        using local_date_type = local_date;
+        using local_datetime_type = local_datetime;
+        using offset_datetime_type = offset_datetime;
+        using array_type = std::vector<toml>;
+        using table_type = std::map<std::string, toml>;
 
         /* @} types */
 
@@ -3087,16 +3253,6 @@ namespace mytoml
          */
         MYTOML_NODISCARD string_t dump(int indent = -1) const;
 
-        /**
-         * @brief Serialize with default pretty indentation.
-         */
-        MYTOML_NODISCARD string_t dump_pretty() const;
-
-        /**
-         * @brief Serialize in compact form.
-         */
-        MYTOML_NODISCARD string_t dump_compact() const;
-
         void dump(FILE *file);
 
         void dump(const char *str);
@@ -3174,18 +3330,34 @@ namespace mytoml
         MYTOML_NODISCARD bool is_array() const noexcept;
         MYTOML_NODISCARD bool is_string() const noexcept;
         MYTOML_NODISCARD bool is_integer() const noexcept;
-        MYTOML_NODISCARD bool is_floating() const noexcept;
         MYTOML_NODISCARD bool is_boolean() const noexcept;
+        MYTOML_NODISCARD bool is_floating() const noexcept;
+        MYTOML_NODISCARD bool is_local_time() const noexcept;
+        MYTOML_NODISCARD bool is_local_date() const noexcept;
+        MYTOML_NODISCARD bool is_local_datetime() const noexcept;
+        MYTOML_NODISCARD bool is_offset_datetime() const noexcept;
 
-        table_t &as_table();
-        const table_t &as_table() const;
-        array_t &as_array();
-        const array_t &as_array() const;
-        std::string &as_string();
-        const std::string &as_string() const;
-        int64_t as_integer() const;
-        double as_floating() const;
-        bool as_boolean() const;
+        table_type &as_table();
+        array_type &as_array();
+        string_type &as_string();
+        integer_type &as_integer();
+        boolean_type &as_boolean();
+        floating_type &as_floating();
+        local_time_type &as_local_time();
+        local_date_type &as_local_date();
+        local_datetime_type &as_local_datetime();
+        offset_datetime_type &as_offset_datetime();
+
+        const table_type &as_table() const;
+        const array_type &as_array() const;
+        const string_type &as_string() const;
+        const integer_type &as_integer() const;
+        const boolean_type &as_boolean() const;
+        const floating_type &as_floating() const;
+        const local_time_type &as_local_time() const;
+        const local_date_type &as_local_date() const;
+        const local_datetime_type &as_local_datetime() const;
+        const offset_datetime_type &as_offset_datetime() const;
 
         //========== Size and Capacity ==========
 
