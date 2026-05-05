@@ -987,10 +987,19 @@ namespace mytoml
             name_separator,
             value_separator,
             string_value,
+            basic_string,
+            literal_string,
+            multiline_literal_string,
+            comment,
             number_value,
             true_literal,
             false_literal,
             null_literal,
+            datetime_literal,
+            time_literal,
+            date_literal,
+            multiline_basic_string,
+
         };
 
         enum class error_t : uint8_t
@@ -1020,6 +1029,14 @@ namespace mytoml
             number,  ///< numeric value (floating point)
             integer, ///< integer value
             boolean, ///< boolean value
+
+            datetime_literal,
+            time_literal,
+            date_literal,
+            multiline_basic_string,
+            null_literal,
+            false_literal,
+            true_literal,
 
             empty,
             floating,
@@ -2126,13 +2143,20 @@ namespace mytoml
              * @{
              */
 
-            bool scan_literal();
+            // TOML specific string scanning
+            bool scan_string();                   // Standard quoted string "..."
+            bool scan_basic_string();             // Basic string '...'
+            bool scan_literal_string();           // Literal string '''...'''
+            bool scan_multiline_basic_string();   // Multiline basic """..."""
+            bool scan_multiline_literal_string(); // Multiline literal ''''...''''
 
-            bool scan_comment();
+            bool scan_number(const std::string &current_text);           // Handles integers, floats, scientific notation, hex, octal, binary
+            bool scan_literal(const std::string &current_text);          // Handles true, false, null
+            bool scan_datetime_literal(const std::string &current_text); // Handles date, time, datetime
+            bool scan_comment();                                         // Handles '#' comments
 
-            bool scan_string();
-
-            bool scan_number();
+            // Helper to scan different TOML value types (numbers, booleans, datetimes, bare keys)
+            bool scan_value();
 
             /** @} group scanner */
 
@@ -2162,9 +2186,9 @@ namespace mytoml
             std::string m_input{};
             size_t m_input_pos{0};
             int m_putback{-1};
-            mark m_position;
-            token m_token;
-            int m_char;
+            mark m_position{};
+            token m_token{};
+            int m_char{EOF};
         };
 
         /**
@@ -2217,7 +2241,6 @@ namespace mytoml
             MYTOML_NODISCARD mytoml::toml parse_local_time();
             MYTOML_NODISCARD mytoml::toml parse_local_datetime();
             MYTOML_NODISCARD mytoml::toml parse_offset_datetime();
-            MYTOML_NODISCARD mytoml::toml parse_local_datetime();
             MYTOML_NODISCARD mytoml::toml parse_null();
             MYTOML_NODISCARD mytoml::toml parse_key();
             MYTOML_NODISCARD mytoml::toml parse_value();
@@ -2245,10 +2268,10 @@ namespace mytoml
             using integer_type = int64_t;
             using floating_type = double;
             using string_type = std::string;
-            using local_time_type = local_time;
-            using local_date_type = local_date;
-            using local_datetime_type = local_datetime;
-            using offset_datetime_type = offset_datetime;
+            using local_time_type = std::string;
+            using local_date_type = std::string;
+            using local_datetime_type = std::string;
+            using offset_datetime_type = std::string;
             using array_type = std::vector<toml>;
             using table_type = std::map<std::string, toml>;
 
@@ -2487,21 +2510,20 @@ namespace mytoml
         {
         public:
             using value_type = toml;
+            using key_type = std::string;
+            using comment_type = std::string;
+            using boolean_type = bool;
+            using integer_type = int64_t;
+            using floating_type = double;
+            using string_type = std::string;
+            using local_time_type = std::string;
+            using local_date_type = std::string;
+            using local_datetime_type = std::string;
+            using offset_datetime_type = std::string;
+            using array_type = std::vector<toml>;
+            using table_type = std::map<std::string, toml>;
 
-            using key_type = typename value_type::key_type;
-            using comment_type = typename value_type::comment_type;
-            using boolean_type = typename value_type::boolean_type;
-            using integer_type = typename value_type::integer_type;
-            using floating_type = typename value_type::floating_type;
-            using string_type = typename value_type::string_type;
-            using local_time_type = typename value_type::local_time_type;
-            using local_date_type = typename value_type::local_date_type;
-            using local_datetime_type = typename value_type::local_datetime_type;
-            using offset_datetime_type = typename value_type::offset_datetime_type;
-            using array_type = typename value_type::array_type;
-            using table_type = typename value_type::table_type;
-
-            using char_type = typename string_type::value_type;
+            using char_type = std::string::value_type;
 
         public:
             /**
@@ -3336,6 +3358,18 @@ namespace mytoml
         MYTOML_NODISCARD bool is_local_date() const noexcept;
         MYTOML_NODISCARD bool is_local_datetime() const noexcept;
         MYTOML_NODISCARD bool is_offset_datetime() const noexcept;
+
+        MYTOML_NODISCARD bool is_float() const noexcept { return is_floating(); }
+        MYTOML_NODISCARD bool is_null() const noexcept { return type() == value_t::null; }
+
+        MYTOML_NODISCARD integer_type &as_int() { return as_integer(); }
+        MYTOML_NODISCARD const integer_type &as_int() const { return as_integer(); }
+        MYTOML_NODISCARD floating_type &as_float() { return as_floating(); }
+        MYTOML_NODISCARD const floating_type &as_float() const { return as_floating(); }
+        MYTOML_NODISCARD boolean_type &as_bool() { return as_boolean(); }
+        MYTOML_NODISCARD const boolean_type &as_bool() const { return as_boolean(); }
+
+        MYTOML_NODISCARD string_t serialize(int indent = -1) const { return dump(indent); }
 
         table_type &as_table();
         array_type &as_array();

@@ -1190,6 +1190,7 @@ namespace mytoml
             return to_copy;
         };
 
+#if 0
         //-----------------------------------------------------------------------------
         // [Class] lexer
         //-----------------------------------------------------------------------------
@@ -1345,162 +1346,455 @@ namespace mytoml
             } while (times != amount);
         };
 
-        bool lexer::scan_literal()
+        // Helper to scan different TOML value types (numbers, booleans, datetimes, bare keys)
+        bool lexer::scan_value()
         {
-            std::string string;
-            if ((m_char >= 'a' && m_char <= 'z') || (m_char >= 'A' && m_char <= 'Z'))
-            {
-                // string.push_back(static_cast<char>(m_char));
-                while (true)
-                {
-                    advance();
-                    if (m_char == EOF)
-                        break;
-                    if ((m_char >= 'a' && m_char <= 'z') || (m_char >= 'A' && m_char <= 'Z'))
-                    {
-                        string.push_back(static_cast<char>(m_char));
-                        continue;
-                    }
-                    reverse();
-                    break;
-                }
-                if (string == "false")
-                {
-                    m_token.type = token_t::false_literal;
-                    m_token.text = string;
-                    return true;
-                }
-                if (string == "true")
-                {
-                    m_token.type = token_t::true_literal;
-                    m_token.text = string;
-                    return true;
-                }
-                if (string == "null")
-                {
-                    m_token.type = token_t::null_literal;
-                    return true;
-                }
-            }
-            return false;
-        };
+            std::string current_text;
+            current_text.push_back(static_cast<char>(m_char));
 
-        bool lexer::scan_comment()
-        {
-            std::string string;
-            switch (m_char)
-            {
-            case '/':
-            {
-                while (true)
-                {
-                    advance();
-                    switch (m_char)
-                    {
-                    case '\n':
-                    case '\r':
-                    case '\0':
-                        return true;
-                    default:
-                        break;
-                    }
-                }
-            }
-
-            case '*':
-            {
-                while (true)
-                {
-                    advance();
-                    switch (m_char)
-                    {
-                    case '\0':
-                    {
-                        return false;
-                    }
-
-                    case '*':
-                    {
-                        advance();
-                        switch (m_char)
-                        {
-                        case '/':
-                            return true;
-                        default:
-                        {
-                            reverse();
-                            continue;
-                        }
-                        }
-                    }
-                    default:
-                        continue;
-                    }
-                }
-            }
-            default:
-            {
-                return false;
-            }
-            }
-        };
-
-        bool lexer::scan_string()
-        {
-            std::string string;
             while (true)
             {
-                advance();
-                if (m_char == EOF)
+                int next_c = get_char();
+                // TOML delimiters and terminators for bare keys, numbers, literals, etc.
+                if (next_c == EOF || next_c == ' ' || next_c == '\t' || next_c == '\n' || next_c == '\r' || next_c == '=' || next_c == ',' || next_c == '[' || next_c == ']' || next_c == '{' || next_c == '}' || next_c == '#')
                 {
-                    m_token.type = token_t::string_value;
-                    return true;
-                }
-                if (m_char == '\\')
-                {
-                    advance();
-                    if (m_char == EOF)
-                        break;
-                    string.push_back(static_cast<char>('\\'));
-                    string.push_back(static_cast<char>(m_char));
-                    continue;
-                }
-                if (m_char == '"')
-                {
-                    m_token.type = token_t::string_value;
-                    m_token.text = string;
-                    return true;
-                }
-                string.push_back(static_cast<char>(m_char));
-            }
-            return false;
-        };
-
-        bool lexer::scan_number()
-        {
-            std::string string;
-            if ((m_char >= '0' && m_char <= '9') || m_char == '-')
-            {
-                string.push_back(static_cast<char>(m_char));
-                while (true)
-                {
-                    advance();
-                    if (m_char == EOF)
-                        break;
-                    if ((m_char >= '0' && m_char <= '9') || m_char == '+' || m_char == '-' || m_char == 'e' || m_char == 'E' || m_char == '.')
-                    {
-                        string.push_back(static_cast<char>(m_char));
-                        continue;
-                    }
-                    reverse();
+                    unget_char(); // Put back the character that ended the scan
                     break;
                 }
+                current_text.push_back(static_cast<char>(next_c));
+            }
+
+            // Attempt to identify the type in order of specificity
+            if (scan_literal(current_text))
+            {                                         // Handles true, false, null
+                m_token.type = token_t::true_literal; // Default to true literal, scan_literal will correct it
+                m_token.text = current_text;
+                return true;
+            }
+            if (scan_datetime_literal(current_text))
+            { // Handles dates, times, datetimes
+                // token_type is set inside scan_datetime_literal
+                m_token.text = current_text;
+                return true;
+            }
+            if (scan_number(current_text))
+            { // Handles integers and floats
                 m_token.type = token_t::number_value;
-                m_token.text = string;
+                m_token.text = current_text;
+                return true;
+            }
+
+            // If it's not a recognized literal, number, or datetime, it's likely a bare key.
+            // Bare keys in TOML can contain letters, numbers, underscores, and dashes.
+            // This simple check assumes it's a valid bare key if it passes the delimiter checks.
+            m_token.type = token_t::string_value; // Treat as string (bare key) for now. Parser will interpret.
+            m_token.text = current_text;
+            return true;
+        };
+
+        // TOML specific string scanning: basic strings '...'
+        bool lexer::scan_basic_string()
+        {
+            std::string str_val;
+            while (true)
+            {
+                int c = get_char();
+                if (c == EOF)
+                { // Unterminated string
+                    MYTOML_THROW(parse_error("Unterminated basic string"));
+                }
+                if (c == '\'')
+                { // End of basic string
+                    m_token.type = token_t::basic_string;
+                    m_token.text = str_val;
+                    return true;
+                }
+                if (c == '\\')
+                { // Escape sequence
+                    int esc = get_char();
+                    if (esc == EOF)
+                        MYTOML_THROW(parse_error("Unterminated escape sequence"));
+                    switch (esc)
+                    {
+                    case '\'':
+                        str_val += '\'';
+                        break;
+                    case '\\':
+                        str_val += '\\';
+                        break;
+                    case 'b':
+                        str_val += '\b';
+                        break;
+                    case 'f':
+                        str_val += '\f';
+                        break;
+                    case 'n':
+                        str_val += '\n';
+                        break;
+                    case 'r':
+                        str_val += '\r';
+                        break;
+                    case 't':
+                        str_val += '\t';
+                        break;
+                    // TOML supports \uXXXX and \UXXXXXXXX unicode escapes
+                    case 'u':            // \uXXXX
+                    case 'U':            // \UXXXXXXXX
+                        str_val += '\\'; // Keep escape char
+                        str_val += static_cast<char>(esc);
+                        for (int i = 0; i < (esc == 'u' ? 4 : 8); ++i)
+                        {
+                            int hex_c = get_char();
+                            if (hex_c == EOF)
+                                MYTOML_THROW(parse_error("Incomplete unicode escape sequence"));
+                            str_val += static_cast<char>(hex_c);
+                        }
+                        break;
+                    default:
+                        MYTOML_THROW(parse_error("Invalid escape sequence"));
+                    }
+                }
+                else
+                {
+                    // Basic strings do NOT allow newline characters
+                    if (c == '\n' || c == '\r')
+                    {
+                        MYTOML_THROW(parse_error("Newline character found in basic string"));
+                    }
+                    str_val += static_cast<char>(c);
+                }
+            }
+            return false; // Should not reach here if successful
+        }
+
+        // TOML literal strings '''...''' (no escapes)
+        bool lexer::scan_literal_string()
+        {
+            std::string str_val;
+            // Consume opening '''
+            for (int i = 0; i < 3; ++i)
+                get_char();
+
+            while (true)
+            {
+                int c = get_char();
+                if (c == EOF)
+                    MYTOML_THROW(parse_error("Unterminated literal string"));
+                if (c == '\'')
+                {
+                    // Check for closing '''
+                    if (get_char() == '\'')
+                    {
+                        if (get_char() == '\'')
+                        {
+                            m_token.type = token_t::literal_string;
+                            m_token.text = str_val;
+                            return true;
+                        }
+                        unget_char();    // Only two ' found, continue
+                        str_val += '\''; // Append first '
+                        str_val += '\''; // Append second '
+                    }
+                    else
+                    {
+                        unget_char();    // Only one ' found, continue
+                        str_val += '\''; // Append the '
+                    }
+                }
+                else
+                {
+                    str_val += static_cast<char>(c);
+                }
+            }
+            return false; // Should not reach here
+        };
+
+        // TOML multiline basic strings """..."""
+        bool lexer::scan_multiline_basic_string()
+        {
+            std::string str_val;
+            // Consume opening """
+            for (int i = 0; i < 3; ++i)
+                get_char();
+
+            while (true)
+            {
+                int c = get_char();
+                if (c == EOF)
+                    MYTOML_THROW(parse_error("Unterminated multiline basic string"));
+                if (c == '"')
+                {
+                    if (get_char() == '"')
+                    {
+                        if (get_char() == '"')
+                        {
+                            m_token.type = token_t::multiline_basic_string;
+                            m_token.text = str_val;
+                            return true;
+                        }
+                        unget_char(); // Only two " found
+                        str_val += '"';
+                        str_val += '"';
+                    }
+                    else
+                    {
+                        unget_char(); // Only one " found
+                        str_val += '"';
+                    }
+                }
+                else
+                {
+                    str_val += static_cast<char>(c);
+                }
+            }
+            return false; // Should not reach here
+        };
+
+        // TOML multiline literal strings ''''...''''
+        bool lexer::scan_multiline_literal_string()
+        {
+            std::string str_val;
+            // Consume opening '''
+            for (int i = 0; i < 3; ++i)
+                get_char();
+
+            while (true)
+            {
+                int c = get_char();
+                if (c == EOF)
+                    MYTOML_THROW(parse_error("Unterminated multiline literal string"));
+                if (c == '\'')
+                {
+                    if (get_char() == '\'')
+                    {
+                        if (get_char() == '\'')
+                        {
+                            m_token.type = token_t::multiline_literal_string;
+                            m_token.text = str_val;
+                            return true;
+                        }
+                        unget_char(); // Only two ' found
+                        str_val += '\'';
+                        str_val += '\'';
+                    }
+                    else
+                    {
+                        unget_char(); // Only one ' found
+                        str_val += '\'';
+                    }
+                }
+                else
+                {
+                    str_val += static_cast<char>(c);
+                }
+            }
+            return false; // Should not reach here
+        }
+
+        // Regular string scanning (quoted strings) "..."
+        bool lexer::scan_string()
+        {
+            std::string str_val;
+            while (true)
+            {
+                int c = get_char();
+                if (c == EOF)
+                { // Unterminated string
+                    MYTOML_THROW(parse_error("Unterminated string"));
+                }
+                if (c == '"')
+                { // End of string
+                    m_token.type = token_t::string_value;
+                    m_token.text = str_val;
+                    return true;
+                }
+                if (c == '\\')
+                { // Escape sequence
+                    int esc = get_char();
+                    if (esc == EOF)
+                        MYTOML_THROW(parse_error("Unterminated escape sequence"));
+                    switch (esc)
+                    {
+                    case '"':
+                        str_val += '"';
+                        break;
+                    case '\\':
+                        str_val += '\\';
+                        break;
+                    case 'b':
+                        str_val += '\b';
+                        break;
+                    case 'f':
+                        str_val += '\f';
+                        break;
+                    case 'n':
+                        str_val += '\n';
+                        break;
+                    case 'r':
+                        str_val += '\r';
+                        break;
+                    case 't':
+                        str_val += '\t';
+                        break;
+                        // TOML allows \uXXXX and \UXXXXXXXX unicode escapes in quoted strings too.
+                    case 'u':            // \uXXXX
+                    case 'U':            // \UXXXXXXXX
+                        str_val += '\''; // Keep escape char
+                        str_val += static_cast<char>(esc);
+                        for (int i = 0; i < (esc == 'u' ? 4 : 8); ++i)
+                        {
+                            int hex_c = get_char();
+                            if (hex_c == EOF)
+                                MYTOML_THROW(parse_error("Incomplete unicode escape sequence"));
+                            str_val += static_cast<char>(hex_c);
+                        }
+                        break;
+                    default:
+                        MYTOML_THROW(parse_error("Invalid escape sequence"));
+                    }
+                }
+                else
+                {
+                    str_val += static_cast<char>(c);
+                }
+            }
+            return false; // Should not reach here
+        }
+
+        // Handles comments starting with '#'
+        void lexer::scan_comment()
+        {
+            while (true)
+            {
+                int c = get_char();
+                if (c == EOF || c == '\n' || c == '\r')
+                {
+                    m_position.line++;
+                    m_position.column = 0;
+                    m_position.index++;
+                    unget_char(); // Put back newline/CR to be processed by next_token
+                    break;
+                }
+                // Consume characters until newline or EOF
+            }
+        }
+
+        // Scans for TOML literals: true, false, null
+        bool lexer::scan_literal(const std::string &current_text)
+        {
+            if (current_text == "true")
+            {
+                m_token.type = token_t::true_literal;
+                return true;
+            }
+            if (current_text == "false")
+            {
+                m_token.type = token_t::false_literal;
+                return true;
+            }
+            if (current_text == "null")
+            {
+                m_token.type = token_t::null_literal;
                 return true;
             }
             return false;
-        };
+        }
+
+        // Scans for TOML numbers (integers, floats, scientific notation, hex, octal, binary)
+        bool lexer::scan_number(const std::string &current_text)
+        {
+            try
+            {
+                // Check for potential float/scientific notation or signs
+                bool is_float_like = false;
+                if (current_text.find('.') != std::string::npos || current_text.find('e') != std::string::npos || current_text.find('E') != std::string::npos)
+                {
+                    is_float_like = true;
+                }
+                else if (!current_text.empty() && (current_text.back() == '+' || current_text.back() == '-'))
+                {
+                    is_float_like = true; // Trailing sign might indicate scientific notation
+                }
+
+                // Check for hex, octal, binary prefixes
+                if (current_text.length() > 2 && current_text[0] == '0')
+                {
+                    char prefix = current_text[1];
+                    if (prefix == 'x' || prefix == 'o' || prefix == 'b')
+                    {
+                        // It's a hex, octal, or binary number.
+                        // The parser will handle validation.
+                    }
+                    if (prefix == '.')
+                    { // e.g., 0.123 is a float
+                        is_float_like = true;
+                    }
+                }
+
+                // Minimal check for general number format
+                bool starts_with_digit_or_sign = !current_text.empty() && (isdigit(current_text[0]) || current_text[0] == '+' || current_text[0] == '-');
+                if (!starts_with_digit_or_sign)
+                    return false;
+
+                for (size_t i = 1; i < current_text.length(); ++i)
+                {
+                    char c = current_text[i];
+                    // Allow digits, '.', 'e', 'E', '+', '-', '_'
+                    if (!isdigit(c) && c != '.' && c != 'e' && c != 'E' && c != '+' && c != '-' && c != '_')
+                    {
+                        return false;
+                    }
+                }
+
+                // If it passed basic checks, consider it a number token.
+                return true;
+            }
+            catch (const std::exception &)
+            {
+                // If standard parsing fails, it's not a number in that form.
+                return false; // Treat as not a number token.
+            }
+        }
+
+        // Scans for TOML datetime literals (date, time, datetime)
+        bool lexer::scan_datetime_literal(const std::string &current_text)
+        {
+            // TOML datetimes follow RFC 3339 / ISO 8601.
+            bool has_digits = false;
+            bool has_separators = false;
+            for (char c : current_text)
+            {
+                if (isdigit(c))
+                    has_digits = true;
+                else if (c == '-' || c == ':' || c == 'T' || c == '.' || c == 'Z' || c == '+' || c == ' ')
+                    has_separators = true;
+                else if (!(isalpha(c)))
+                    return false; // Allow letters only in datetime specifiers like 'Z'
+            }
+
+            if (has_digits && has_separators)
+            {
+                // Determine the specific token type based on format.
+                if (current_text.find('T') != std::string::npos || current_text.find('+') != std::string::npos || current_text.find('Z') != std::string::npos || current_text.find(' ') != std::string::npos)
+                { // Includes offset or 'Z' or space separator
+                    m_token.type = token_t::datetime_literal;
+                }
+                else if (current_text.find(':') != std::string::npos)
+                { // Contains time separators
+                    m_token.type = token_t::time_literal;
+                }
+                else if (current_text.find('-') != std::string::npos)
+                { // Contains date separators
+                    m_token.type = token_t::date_literal;
+                }
+                else
+                {
+                    m_token.type = token_t::datetime_literal; // Default if ambiguous
+                }
+                return true;
+            }
+            return false;
+        }
 
         [[nodiscard]] int lexer::get_char()
         {
@@ -1574,138 +1868,534 @@ namespace mytoml
             m_token.text.clear();
             m_token.type = token_t::unknown;
 
-            int c = skip_ws();
+            int c = get_char();
+            while (c != EOF && (c == ' ' || c == '\t' || c == '\n' || c == '\r'))
+            {
+                if (c == '\n')
+                { // Handle newline for position tracking
+                    m_position.line++;
+                    m_position.column = 0;
+                }
+                else
+                {
+                    m_position.column++;
+                }
+                m_position.index++;
+                c = get_char();
+            }
+
             if (c == EOF)
             {
                 m_token.type = token_t::end_of_input;
                 return m_token;
             }
+            m_char = c; // Store the first non-whitespace character
 
-            c = get_char();
+            m_token.start = m_position; // Mark the start of the token
 
-            switch (c)
+            switch (m_char)
             {
-            case '{':
-                m_token.type = token_t::object_start;
-                return m_token;
-            case '}':
-                m_token.type = token_t::object_end;
-                return m_token;
-            case '[':
-                m_token.type = token_t::array_start;
-                return m_token;
-            case ']':
-                m_token.type = token_t::array_end;
-                return m_token;
+            case '=':
+                m_token.type = token_t::name_separator;
+                break;
             case ',':
                 m_token.type = token_t::value_separator;
-                return m_token;
-            case ':':
-                m_token.type = token_t::name_separator;
-                return m_token;
-            case '"':
-            {
-                // parse string
-                while (true)
+                break;
+            case '[':
+                // Peek ahead for '[[', indicating array of tables
+                if (get_char() == '[')
                 {
-                    int ch = get_char();
-                    if (ch == EOF)
-                    {
-                        m_token.type = token_t::string_value;
-                        return m_token;
-                    }
-                    if (ch == '\\')
-                    {
-                        int esc = get_char();
-                        if (esc == EOF)
-                            break;
-                        // handle simple escapes; for brevity we append raw
-                        // sequences; a complete implementation would decode
-                        // unicode escapes.
-                        add_char('\\');
-                        add_char(esc);
-                        continue;
-                    }
-                    if (ch == '"')
-                    {
-                        m_token.type = token_t::string_value;
-                        m_token.text = m_string;
-                        return m_token;
-                    }
-                    add_char(ch);
+                    m_token.type = token_t::array_start; // Use existing array_start for simplicity, parser needs to distinguish
+                    m_token.text = "[[";                 // Store for parser context
+                    advance();                           // Consume the second '['
+                }
+                else
+                {
+                    unget_char(); // Put back the char if it wasn't '[['
+                    m_token.type = token_t::array_start;
+                    m_token.text = "[";
                 }
                 break;
-            }
+            case ']':
+                m_token.type = token_t::array_end;
+                break;
+            case '{':
+                m_token.type = token_t::object_start;
+                break; // Used for inline tables
+            case '}':
+                m_token.type = token_t::object_end;
+                break; // Used for inline tables
+            case '"':  // Standard quoted string
+                if (scan_string())
+                    return m_token;
+                break;
+            case '\'': // Basic string '...'
+                if (scan_basic_string())
+                    return m_token;
+                break;
+            case '#':                // Comment
+                scan_comment();      // Consume the rest of the line
+                return next_token(); // Return the next token after comment
             default:
+                if (scan_value())
+                    return m_token; // Handles numbers, bools, datetimes, and bare keys
                 break;
             }
 
-            // numbers, literals (true,false,null)
-            if ((c >= '0' && c <= '9') || c == '-')
-            {
-                // number
-                m_string.push_back(static_cast<char>(c));
-                while (true)
-                {
-                    int ch = get_char();
-                    if (ch == EOF)
-                        break;
-                    if ((ch >= '0' && ch <= '9') || ch == '+' || ch == '-' || ch == 'e' || ch == 'E' || ch == '.')
-                    {
-                        m_string.push_back(static_cast<char>(ch));
-                        continue;
-                    }
-                    unget_char();
-                    break;
-                }
-                m_token.type = token_t::number_value;
-                m_token.text = m_string;
-                return m_token;
-            }
-
-            // true, false, null
-            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))
-            {
-                m_string.push_back(static_cast<char>(c));
-                while (true)
-                {
-                    int ch = get_char();
-                    if (ch == EOF)
-                        break;
-                    if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'))
-                    {
-                        m_string.push_back(static_cast<char>(ch));
-                        continue;
-                    }
-                    unget_char();
-                    break;
-                }
-
-                if (m_string == "false")
-                {
-                    m_token.type = token_t::false_literal;
-                    m_token.text = m_string;
-                    return m_token;
-                }
-
-                if (m_string == "true")
-                {
-                    m_token.type = token_t::true_literal;
-                    m_token.text = m_string;
-                    return m_token;
-                }
-
-                if (m_string == "null")
-                {
-                    m_token.type = token_t::null_literal;
-                    return m_token;
-                }
-            }
-
-            // unknown single char
-            m_token.type = token_t::unknown;
+            m_token.end = m_position; // Mark the end of the token (even if unknown)
             return m_token;
+        };
+
+        //-----------------------------------------------------------------------------
+        // [Class] Parser
+        //-----------------------------------------------------------------------------
+
+        // Helper for parsing unicode escape sequences
+        namespace
+        {
+            static bool is_hex_digit(char ch) { return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F'); }
+            static unsigned int hex_value(char ch)
+            {
+                if (ch >= '0' && ch <= '9')
+                    return static_cast<unsigned int>(ch - '0');
+                if (ch >= 'a' && ch <= 'f')
+                    return static_cast<unsigned int>(10 + (ch - 'a'));
+                return static_cast<unsigned int>(10 + (ch - 'A'));
+            }
+
+            // Helper to parse UTF-16 escape sequences (\uXXXX)
+            static unsigned int parse_u16_hex(const std::string &text, size_t index)
+            {
+                if (index + 4 > text.size())
+                    MYTOML_THROW(parse_error("Invalid unicode escape sequence"));
+                unsigned int value = 0;
+                for (size_t i = 0; i < 4; ++i)
+                {
+                    const char ch = text[index + i];
+                    if (!is_hex_digit(ch))
+                        MYTOML_THROW(parse_error("Invalid unicode escape sequence"));
+                    value = (value << 4U) | hex_value(ch);
+                }
+                return value;
+            }
+
+            // Helper to parse UTF-32 escape sequences (\UXXXXXXXX)
+            static unsigned int parse_u32_hex(const std::string &text, size_t index)
+            {
+                if (index + 8 > text.size())
+                    MYTOML_THROW(parse_error("Invalid unicode escape sequence"));
+                unsigned int value = 0;
+                for (size_t i = 0; i < 8; ++i)
+                {
+                    const char ch = text[index + i];
+                    if (!is_hex_digit(ch))
+                        MYTOML_THROW(parse_error("Invalid unicode escape sequence"));
+                    value = (value << 4U) | hex_value(ch);
+                }
+                return value;
+            }
+
+            // Helper to append a decoded UTF-8 codepoint to a string
+            static void append_utf8_codepoint(std::string &out, unsigned int cp)
+            {
+                char tmp[4] = {0, 0, 0, 0};
+                const int encoded = utf8::encode(cp, reinterpret_cast<utf8::char_t *>(tmp), sizeof(tmp));
+                if (encoded <= 0)
+                {
+                    MYTOML_THROW(parse_error("Invalid unicode codepoint"));
+                }
+                out.append(tmp, tmp + encoded);
+            }
+        } // namespace
+
+        parser::parser(lexer *lexer)
+            : m_lexer(lexer), m_current{}
+        {
+            if (m_lexer == nullptr)
+            {
+                MYTOML_THROW(parse_error("Invalid parser state"));
+            }
+            advance(); // Read the first token
         }
+
+        void parser::advance() { m_current = m_lexer->next_token(); }
+
+        // Parses TOML quoted strings (handling escapes)
+        std::string parser::parse_string(const std::string &text)
+        {
+            std::string result;
+            result.reserve(text.size()); // Pre-allocate memory
+
+            for (size_t i = 0; i < text.size(); ++i)
+            {
+                const char ch = text[i];
+                if (ch != '\\')
+                {
+                    result.push_back(ch);
+                    continue;
+                }
+
+                if (i + 1 >= text.size())
+                {
+                    MYTOML_THROW(parse_error("Invalid escape sequence"));
+                }
+
+                const char esc = text[++i];
+                switch (esc)
+                {
+                case '"':
+                    result.push_back('"');
+                    break;
+                case '\\':
+                    result.push_back('\\');
+                    break;
+                case '/':
+                    result.push_back('/');
+                    break; // Allowed escape in TOML
+                case 'b':
+                    result.push_back('\b');
+                    break;
+                case 'f':
+                    result.push_back('\f');
+                    break;
+                case 'n':
+                    result.push_back('\n');
+                    break;
+                case 'r':
+                    result.push_back('\r');
+                    break;
+                case 't':
+                    result.push_back('\t');
+                    break;
+                case 'u':
+                { // \uXXXX
+                    unsigned int codepoint = parse_u16_hex(text, i + 1);
+                    i += 4; // Consume the 4 hex digits
+                    // Handle surrogate pairs for characters > 0xFFFF
+                    if (codepoint >= 0xD800 && codepoint <= 0xDBFF)
+                    { // High surrogate
+                        if (i + 6 >= text.size() || text[i + 1] != '' || text[i + 2] != 'u')
+                        {
+                            MYTOML_THROW(parse_error("Invalid unicode surrogate pair"));
+                        }
+                        unsigned int low = parse_u16_hex(text, i + 3);
+                        if (low < 0xDC00 || low > 0xDFFF)
+                        { // Must be a low surrogate
+                            MYTOML_THROW(parse_error("Invalid unicode surrogate pair"));
+                        }
+                        // Combine surrogates into a single codepoint
+                        codepoint = 0x10000 + (((codepoint - 0xD800) << 10U) | (low - 0xDC00));
+                        i += 6; // Consume \uXXXX for the low surrogate
+                    }
+                    append_utf8_codepoint(result, codepoint);
+                    break;
+                }
+                case 'U':
+                { // \UXXXXXXXX
+                    unsigned int codepoint = parse_u32_hex(text, i + 1);
+                    i += 8; // Consume the 8 hex digits
+                    // Check if codepoint is valid (within Unicode range)
+                    if (codepoint > 0x10FFFF || (codepoint >= 0xD800 && codepoint <= 0xDFFF))
+                    {
+                        MYTOML_THROW(parse_error("Invalid unicode codepoint"));
+                    }
+                    append_utf8_codepoint(result, codepoint);
+                    break;
+                }
+                default:
+                    MYTOML_THROW(parse_error("Invalid escape sequence"));
+                }
+            }
+            return result;
+        }
+
+        // Parses TOML numbers (integers and floats)
+        toml parser::parse_number(const std::string &text)
+        {
+            try
+            {
+                // TOML numbers can be integers, floats, scientific notation, hex, octal, binary.
+                // This is a simplified check; a full implementation would parse according to TOML spec.
+
+                // Check for potential float/scientific notation or signs
+                bool is_float_like = false;
+                if (text.find('.') != std::string::npos || text.find('e') != std::string::npos || text.find('E') != std::string::npos)
+                {
+                    is_float_like = true;
+                }
+                else if (!text.empty() && (text.back() == '+' || text.back() == '-'))
+                {
+                    is_float_like = true; // Trailing sign might indicate scientific notation
+                }
+
+                // Check for hex, octal, binary prefixes
+                if (text.length() > 2 && text[0] == '0')
+                {
+                    char prefix = text[1];
+                    if (prefix == 'x' || prefix == 'o' || prefix == 'b')
+                    {
+                        // It's a hex, octal, or binary number.
+                        // The parser will handle validation.
+                    }
+                    if (prefix == '.')
+                    { // e.g., 0.123 is a float
+                        is_float_like = true;
+                    }
+                }
+
+                // Minimal check for general number format
+                bool starts_with_digit_or_sign = !text.empty() && (isdigit(text[0]) || text[0] == '+' || text[0] == '-');
+                if (!starts_with_digit_or_sign)
+                    return false;
+
+                for (size_t i = 1; i < text.length(); ++i)
+                {
+                    char c = text[i];
+                    // Allow digits, '.', 'e', 'E', '+', '-', '_'
+                    if (!isdigit(c) && c != '.' && c != 'e' && c != 'E' && c != '+' && c != '-' && c != '_')
+                    {
+                        return false;
+                    }
+                }
+
+                // If it passed basic checks, consider it a number token.
+                return true;
+            }
+            catch (const std::exception &)
+            {
+                // If standard parsing fails, it's not a number in that form.
+                return false; // Treat as not a number token.
+            }
+        }
+
+        // Parses TOML datetime, date, and time literals
+        toml parser::parse_datetime(const std::string &text)
+        {
+            return toml(text); // Store as string for now
+        }
+        toml parser::parse_date(const std::string &text) { return toml(text); }
+        toml parser::parse_time(const std::string &text) { return toml(text); }
+
+        // Parses TOML arrays (e.g., [1, 2, 3])
+        toml parser::parse_array()
+        {
+            toml array_val = toml::array();
+
+            advance(); // Consume '['
+            if (m_current.type == token_t::array_end)
+            { // Empty array
+                advance();
+                return array_val;
+            }
+
+            while (true)
+            {
+                array_val.push_back(parse_value());
+
+                if (m_current.type == token_t::value_separator)
+                { // Comma found, expect more elements
+                    advance();
+                    continue;
+                }
+
+                if (m_current.type == token_t::array_end)
+                { // End of array
+                    advance();
+                    break;
+                }
+
+                MYTOML_THROW(parse_error("Expected ',' or ']' in array"));
+            }
+            return array_val;
+        }
+
+        // Parses TOML tables (e.g., { key = value } or [table.name])
+        toml parser::parse_object()
+        { // Renamed to parse_table for TOML context
+            toml table_val = toml::table();
+
+            // Handle inline tables { key = value }
+            if (m_current.type == token_t::object_start)
+            {
+                advance(); // Consume '{'
+                if (m_current.type == token_t::object_end)
+                { // Empty inline table
+                    advance();
+                    return table_val;
+                }
+
+                while (true)
+                {
+                    // Key can be a quoted or basic string token
+                    if (m_current.type != token_t::string_value && m_current.type != token_t::basic_string)
+                    {
+                        MYTOML_THROW(parse_error("Expected table key (string) in inline table"));
+                    }
+
+                    std::string key = m_current.text; // Key is the token's text
+                    advance();                        // Consume key
+
+                    if (m_current.type != token_t::name_separator)
+                    { // Expect '='
+                        MYTOML_THROW(parse_error("Expected '=' after inline table key"));
+                    }
+                    advance(); // Consume '='
+
+                    table_val[key] = parse_value();
+
+                    if (m_current.type == token_t::value_separator)
+                    { // Comma found, expect more key-value pairs
+                        advance();
+                        continue;
+                    }
+
+                    if (m_current.type == token_t::object_end)
+                    { // End of inline table
+                        advance();
+                        break;
+                    }
+                    MYTOML_THROW(parse_error("Expected ',' or '}' in inline table"));
+                }
+            }
+            else
+            {
+                // This function is specifically for inline tables. Top-level table headers are handled elsewhere.
+                MYTOML_THROW(parse_error("Cannot parse non-inline table structure here"));
+            }
+
+            return table_val;
+        }
+
+        // Parses a single TOML value (string, number, boolean, null, array, table, datetime)
+        toml parser::parse_value()
+        {
+            switch (m_current.type)
+            {
+            case token_t::null_literal:
+                advance();
+                return toml(nullptr);
+            case token_t::true_literal:
+                advance();
+                return toml(true);
+            case token_t::false_literal:
+                advance();
+                return toml(false);
+            case token_t::number_value:
+            {
+                const std::string value = m_current.text;
+                advance();
+                return parse_number(value);
+            }
+            case token_t::string_value:
+            { // Standard quoted string "..."
+                const std::string value = parse_string(m_current.text);
+                advance();
+                return toml(value);
+            }
+            case token_t::basic_string:
+            {                                                  // Basic string '...'
+                const std::string value = scan_basic_string(); // Assumes scan_basic_string sets m_token.text
+                advance();
+                return toml(value);
+            }
+            case token_t::literal_string:
+            {                                                    // Literal string '''...'''
+                const std::string value = scan_literal_string(); // Assumes scan_literal_string updates m_token.text
+                advance();
+                return toml(value);
+            }
+            case token_t::multiline_basic_string:
+            {                                                            // Multiline basic """..."""
+                const std::string value = scan_multiline_basic_string(); // Assumes scan_multiline_basic_string updates m_token.text
+                advance();
+                return toml(value);
+            }
+            case token_t::multiline_literal_string:
+            {                                                              // Multiline literal ''''...''''
+                const std::string value = scan_multiline_literal_string(); // Assumes scan_multiline_literal_string updates m_token.text
+                advance();
+                return toml(value);
+            }
+            case token_t::datetime_literal:
+            {
+                const std::string value = m_current.text;
+                advance();
+                return parse_datetime(value);
+            }
+            case token_t::date_literal:
+            {
+                const std::string value = m_current.text;
+                advance();
+                return parse_date(value);
+            }
+            case token_t::time_literal:
+            {
+                const std::string value = m_current.text;
+                advance();
+                return parse_time(value);
+            }
+            case token_t::array_start:
+                return parse_array();
+            case token_t::object_start: // For inline tables
+                return parse_object();
+            default:
+                MYTOML_THROW(parse_error("Unexpected token while parsing value"));
+            }
+        }
+
+        // Main parse function for a TOML document.
+        // This needs to handle [table] headers, [[array.of.tables]] headers,
+        // and key-value pairs at different levels.
+        toml parser::parse()
+        {
+            toml root_table = toml::table(); // TOML documents are essentially tables
+
+            while (m_current.type != token_t::end_of_input)
+            {
+                if (m_current.type == token_t::comment)
+                {
+                    advance(); // Skip comments
+                    continue;
+                }
+
+                // Handle table headers: [table.name] and [[array.of.tables]]
+                if (m_current.type == token_t::name_separator && m_current.text == "[")
+                { // Check for '[' token
+                    // This needs careful parsing to distinguish [table] from [[array]]
+                    // and to parse the full dotted key. This is a complex part of TOML parsing.
+                    MYTOML_THROW(parse_error("Table header parsing not yet implemented"));
+                }
+
+                // If it's not a header or comment, it must be a key-value pair or an inline table assignment
+                if (m_current.type == token_t::string_value || m_current.type == token_t::basic_string /* add other key types if needed */)
+                {
+                    std::string key = m_current.text; // Key is the token's text
+                    advance();                        // Consume key
+
+                    if (m_current.type != token_t::name_separator)
+                    { // Expect '='
+                        MYTOML_THROW(parse_error("Expected '=' after key"));
+                    }
+                    advance(); // Consume '='
+
+                    root_table[key] = parse_value(); // Parse the value
+                    continue;
+                }
+
+                if (m_current.type == token_t::object_start)
+                { // Inline table assignment: key = { ... }
+                    // This case is handled within parse_value now if '{' is encountered after '='
+                    // If '{' is encountered at the top level without a preceding key, it's an error.
+                    MYTOML_THROW(parse_error("Unexpected inline table start at top level"));
+                }
+
+                MYTOML_THROW(parse_error("Unexpected token at top level"));
+            }
+
+            return root_table;
+        }
+
+#endif
 
         //-------------------------------------------------------------------------
         // [SECTION] Details : Output
@@ -1993,19 +2683,16 @@ namespace mytoml
     }
 
     toml::toml(std::nullptr_t) noexcept
-        : m_value(nullptr)
-    {
-    };
+        : m_value(nullptr) {
+          };
 
     toml::toml(bool value) noexcept
-        : m_value(value)
-    {
-    };
+        : m_value(value) {
+          };
 
     toml::toml(int value) noexcept
-        : m_value(static_cast<integer_t>(value))
-    {
-    };
+        : m_value(static_cast<integer_t>(value)) {
+          };
 
     toml::toml(value_t value) noexcept
     {
@@ -2047,49 +2734,40 @@ namespace mytoml
     };
 
     toml::toml(integer_t value) noexcept
-        : m_value(value)
-    {
-    };
+        : m_value(value) {
+          };
 
     toml::toml(number_t value) noexcept
-        : m_value(value)
-    {
-    };
+        : m_value(value) {
+          };
 
     toml::toml(const char *value)
-        : m_value(string_t(value != nullptr ? value : ""))
-    {
-    };
+        : m_value(string_t(value != nullptr ? value : "")) {
+          };
 
     toml::toml(const string_t &value)
-        : m_value(value)
-    {
-    };
+        : m_value(value) {
+          };
 
     toml::toml(const string_t &&value)
-        : m_value(std::move(value))
-    {
-    };
+        : m_value(std::move(value)) {
+          };
 
     toml::toml(const array_t &value)
-        : m_value(std::make_shared<array_t>(value))
-    {
-    };
+        : m_value(std::make_shared<array_t>(value)) {
+          };
 
     toml::toml(const array_t &&value)
-        : m_value(std::make_shared<array_t>(std::move(value)))
-    {
-    };
+        : m_value(std::make_shared<array_t>(std::move(value))) {
+          };
 
     toml::toml(const table_t &value)
-        : m_value(std::make_shared<table_t>(value))
-    {
-    };
+        : m_value(std::make_shared<table_t>(value)) {
+          };
 
     toml::toml(const table_t &&value)
-        : m_value(std::make_shared<table_t>(std::move(value)))
-    {
-    };
+        : m_value(std::make_shared<table_t>(std::move(value))) {
+          };
 
     toml::toml(toml::initializer_list_t init, bool type_deduction, toml::value_t manual_type)
     {
@@ -2686,7 +3364,7 @@ namespace mytoml
                 auto value_text = trim(entry.substr(eq + 1));
                 table[key] = parse_value(value_text);
             }
-            return toml{table};
+            return toml(table);
         }
 
         toml parse_array(const std::string &body)
@@ -2699,7 +3377,7 @@ namespace mytoml
                     continue;
                 arr.push_back(parse_value(entry));
             }
-            return toml{arr};
+            return toml(arr);
         }
 
         toml parse_string(const std::string &text)
@@ -2737,7 +3415,7 @@ namespace mytoml
                     out.push_back(c);
                 }
             }
-            return toml{out};
+            return toml(out);
         }
 
         toml parse_value(const std::string &raw)
@@ -2768,9 +3446,9 @@ namespace mytoml
 
             // Boolean
             if (text == "true")
-                return toml{true};
+                return toml(true);
             if (text == "false")
-                return toml{false};
+                return toml(false);
 
             // Number detection
             bool has_dot = false;
@@ -2787,17 +3465,26 @@ namespace mytoml
             {
                 if (has_dot || has_exp)
                 {
-                    double d = std::stod(text);
-                    return toml{d};
+                    size_t consumed = 0;
+                    double d = std::stod(text, &consumed);
+                    if (consumed == text.size())
+                        return toml(d);
                 }
-                int64_t v = std::stoll(text);
-                return toml{v};
+                else
+                {
+                    size_t consumed = 0;
+                    int64_t v = std::stoll(text, &consumed);
+                    if (consumed == text.size())
+                        return toml(v);
+                }
             }
             catch (...)
             {
                 // Fallback: bare string
-                return toml{text};
+                return toml(text);
             }
+
+            return toml(text);
         }
 
         void ensure_path(toml::table_t &root, const std::vector<std::string> &keys, size_t upto, toml::table_t **out)
@@ -2819,32 +3506,147 @@ namespace mytoml
         table_t root;
         table_t *current = &root;
 
-        std::istringstream in(text);
-        std::string line;
-        while (std::getline(in, line))
+        auto strip_comment = [](const std::string &line)
         {
-            auto trimmed = trim(line);
-            if (trimmed.empty())
-                continue;
-            if (trimmed[0] == '#')
+            bool in_string = false;
+            bool escaped = false;
+            for (size_t i = 0; i < line.size(); ++i)
+            {
+                const char c = line[i];
+                if (in_string)
+                {
+                    if (escaped)
+                    {
+                        escaped = false;
+                    }
+                    else if (c == '\\')
+                    {
+                        escaped = true;
+                    }
+                    else if (c == '"')
+                    {
+                        in_string = false;
+                    }
+                    continue;
+                }
+
+                if (c == '"')
+                {
+                    in_string = true;
+                    continue;
+                }
+
+                if (c == '#')
+                {
+                    return line.substr(0, i);
+                }
+            }
+            return line;
+        };
+
+        auto find_top_level_equals = [](const std::string &line) -> std::string::size_type
+        {
+            bool in_string = false;
+            bool escaped = false;
+            int depth_brace = 0;
+            int depth_bracket = 0;
+            for (std::string::size_type i = 0; i < line.size(); ++i)
+            {
+                const char c = line[i];
+                if (in_string)
+                {
+                    if (escaped)
+                    {
+                        escaped = false;
+                    }
+                    else if (c == '\\')
+                    {
+                        escaped = true;
+                    }
+                    else if (c == '"')
+                    {
+                        in_string = false;
+                    }
+                    continue;
+                }
+
+                if (c == '"')
+                {
+                    in_string = true;
+                    continue;
+                }
+                if (c == '{')
+                {
+                    ++depth_brace;
+                    continue;
+                }
+                if (c == '}')
+                {
+                    --depth_brace;
+                    continue;
+                }
+                if (c == '[')
+                {
+                    ++depth_bracket;
+                    continue;
+                }
+                if (c == ']')
+                {
+                    --depth_bracket;
+                    continue;
+                }
+                if (c == '=' && depth_brace == 0 && depth_bracket == 0)
+                {
+                    return i;
+                }
+            }
+            return std::string::npos;
+        };
+
+        std::istringstream input(text);
+        std::string line;
+        while (std::getline(input, line))
+        {
+            const std::string cleaned = trim(strip_comment(line));
+            if (cleaned.empty())
                 continue;
 
-            if (trimmed.front() == '[' && trimmed.back() == ']')
+            if (cleaned.size() >= 4 && cleaned.front() == '[' && cleaned[1] == '[' && cleaned[cleaned.size() - 2] == ']' && cleaned.back() == ']')
             {
-                // Table header
-                auto body = trimmed.substr(1, trimmed.size() - 2);
-                auto parts = split_top_level(body, '.');
+                const std::string body = cleaned.substr(2, cleaned.size() - 4);
+                const auto parts = split_top_level(body, '.');
+                if (parts.empty())
+                    throw parse_error("invalid array-of-tables header");
+
+                table_t *target = nullptr;
+                ensure_path(root, parts, parts.size() - 1, &target);
+                toml &slot = (*target)[parts.back()];
+                slot.ensure_array();
+                slot.as_array().emplace_back(table_t{});
+                current = &slot.as_array().back().as_table();
+                continue;
+            }
+
+            if (cleaned.front() == '[' && cleaned.back() == ']')
+            {
+                const std::string body = cleaned.substr(1, cleaned.size() - 2);
+                const auto parts = split_top_level(body, '.');
+                if (parts.empty())
+                    throw parse_error("invalid table header");
+
                 ensure_path(root, parts, parts.size(), &current);
                 continue;
             }
 
-            auto eq = trimmed.find('=');
+            const auto eq = find_top_level_equals(cleaned);
             if (eq == std::string::npos)
                 throw parse_error("expected '=' in assignment");
 
-            auto key_part = trim(trimmed.substr(0, eq));
-            auto value_part = trimmed.substr(eq + 1);
-            auto keys = split_top_level(key_part, '.');
+            const std::string key_part = trim(cleaned.substr(0, eq));
+            const std::string value_part = trim(cleaned.substr(eq + 1));
+            const auto keys = split_top_level(key_part, '.');
+            if (keys.empty())
+                throw parse_error("invalid key");
 
             table_t *target = nullptr;
             if (keys.size() > 1)
@@ -2856,11 +3658,10 @@ namespace mytoml
                 target = current;
             }
 
-            auto key = keys.back();
-            (*target)[key] = parse_value(value_part);
+            (*target)[keys.back()] = parse_value(value_part);
         }
 
-        return toml{root};
+        return toml(root);
     }
 
     toml toml::parse(FILE *file)
@@ -2925,6 +3726,10 @@ namespace mytoml
     bool toml::is_integer() const noexcept { return type() == node_t::integer; }
     bool toml::is_floating() const noexcept { return type() == node_t::number; }
     bool toml::is_boolean() const noexcept { return type() == node_t::boolean; }
+    bool toml::is_local_time() const noexcept { return false; }
+    bool toml::is_local_date() const noexcept { return false; }
+    bool toml::is_local_datetime() const noexcept { return false; }
+    bool toml::is_offset_datetime() const noexcept { return false; }
 
     toml::table_t &toml::as_table() { return *std::get<std::shared_ptr<table_t>>(m_value); }
     const toml::table_t &toml::as_table() const { return *std::get<std::shared_ptr<table_t>>(m_value); }
@@ -2932,14 +3737,23 @@ namespace mytoml
     const toml::array_t &toml::as_array() const { return *std::get<std::shared_ptr<array_t>>(m_value); }
     std::string &toml::as_string() { return std::get<std::string>(m_value); }
     const std::string &toml::as_string() const { return std::get<std::string>(m_value); }
-    int64_t toml::as_integer() const { return std::get<int64_t>(m_value); }
-    double toml::as_floating() const
+    toml::integer_type &toml::as_integer() { return std::get<integer_t>(m_value); }
+    const toml::integer_type &toml::as_integer() const { return std::get<integer_t>(m_value); }
+    toml::boolean_type &toml::as_boolean() { return std::get<boolean_t>(m_value); }
+    const toml::boolean_type &toml::as_boolean() const { return std::get<boolean_t>(m_value); }
+    toml::floating_type &toml::as_floating() { return std::get<number_t>(m_value); }
+    const toml::floating_type &toml::as_floating() const
     {
-        if (std::holds_alternative<double>(m_value))
-            return std::get<double>(m_value);
-        return static_cast<double>(std::get<int64_t>(m_value));
+        return std::get<number_t>(m_value);
     }
-    bool toml::as_boolean() const { return std::get<bool>(m_value); }
+    toml::local_time_type &toml::as_local_time() { MYTOML_THROW(parse_error("local_time is not stored in this build")); }
+    const toml::local_time_type &toml::as_local_time() const { MYTOML_THROW(parse_error("local_time is not stored in this build")); }
+    toml::local_date_type &toml::as_local_date() { MYTOML_THROW(parse_error("local_date is not stored in this build")); }
+    const toml::local_date_type &toml::as_local_date() const { MYTOML_THROW(parse_error("local_date is not stored in this build")); }
+    toml::local_datetime_type &toml::as_local_datetime() { MYTOML_THROW(parse_error("local_datetime is not stored in this build")); }
+    const toml::local_datetime_type &toml::as_local_datetime() const { MYTOML_THROW(parse_error("local_datetime is not stored in this build")); }
+    toml::offset_datetime_type &toml::as_offset_datetime() { MYTOML_THROW(parse_error("offset_datetime is not stored in this build")); }
+    const toml::offset_datetime_type &toml::as_offset_datetime() const { MYTOML_THROW(parse_error("offset_datetime is not stored in this build")); }
 
     //========== Serialization ==========
 
