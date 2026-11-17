@@ -18,6 +18,13 @@ if mytoml_build_tests
 
 	mytoml_test_sources = [
 		'cxx/Main.test.cpp',
+		'cxx/Api.test.cpp',
+		'cxx/Emit.test.cpp',
+		'cxx/Encoding.test.cpp',
+		'cxx/Errors.test.cpp',
+		'cxx/Parse.test.cpp',
+		'cxx/Values.test.cpp',
+		'cxx/Version.test.cpp',
 	]
 
 	mytoml_test_exe = executable(
@@ -47,6 +54,24 @@ if mytoml_build_tests
 	)
 
 	test('mytoml_c_tests', mytomlc_test_exe)
+
+    #===========================
+    # C++ Benchmarks           #
+    #===========================
+
+	if get_option('mytoml_build_benchmarks')
+		mytoml_benchmark_exe = executable(
+			'mytoml_cpp_benchmarks',
+			'bench/Benchmarks.bench.cpp',
+			include_directories: [mytoml_include_dirs, catch2_include_dirs],
+			dependencies: [mytoml_dep, catch2_dep],
+			install: false
+		)
+
+		# Benchmarks are registered as a Meson benchmark suite and are only
+		# run explicitly with `meson test --benchmark`.
+		benchmark('mytoml_cpp_benchmarks', mytoml_benchmark_exe)
+	endif
 
 endif
 

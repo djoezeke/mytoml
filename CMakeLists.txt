@@ -219,8 +219,8 @@ set(MYTOML_CMAKE_VERSION_CONFIG_FILE  ${MYTOML_CMAKE_CONFIG_DIR}/${PROJECT_NAME}
 include(CMakeParseArguments)
 
 # example: mytoml_make_library(Mytoml
-#                       SOURCES mytomlc.cpp ...
-#                       DEPENDS Mytoml::MytomlC
+#                       SOURCES mytoml.cpp ...
+#                       DEPENDS Mytoml::Mytoml
 #                       [STATIC]) # Always create a static library
 macro(mytoml_make_library library)
 
@@ -356,7 +356,7 @@ set(MYTOML_EXPORT_TARGETS mytoml)
 # define the mytomlc target
 if(MYTOML_BUILD_CMYTOML)
     mytoml_make_library(MytomlC
-                        SOURCES src/mytomlc.cpp
+                        SOURCES src/mytoml.c
                         DEPENDS Mytoml::Mytoml
                         )
     list(APPEND MYTOML_EXPORT_TARGETS mytomlc)
@@ -410,6 +410,10 @@ endif()
 
 # add an option for building the tests
 mytoml_set_option(MYTOML_BUILD_TESTS OFF BOOL "ON to build the CMYTOML test suite, OFF to ignore it")
+
+# add an option for building the Catch2 micro-benchmarks. Benchmarks build by
+# default whenever the test suite is enabled, but are not registered with CTest.
+mytoml_set_option(MYTOML_BUILD_BENCHMARKS ${MYTOML_BUILD_TESTS} BOOL "ON to build Catch2 micro-benchmarks (requires MYTOML_BUILD_TESTS)")
 
 # Build the test apps   
 if(MYTOML_BUILD_TESTS)

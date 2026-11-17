@@ -1,5 +1,5 @@
 /**
- * @file mytomlc.cpp
+ * @file mytoml.c
  * @author Sackey Ezekiel Etrue (djoezeke)
  * @see https://www.github.com/djoezeke/mytoml
  * @copyright Copyright (c) 2025 Sackey Ezekiel Etrue
@@ -61,7 +61,6 @@
 //-----------------------------------------------------------------------------
 
 #include <mytoml/mytoml.h>
-#include <mytoml/mytoml.hpp>
 
 //-------------------------------------------------------------------------
 // [SECTION] Macro Defines

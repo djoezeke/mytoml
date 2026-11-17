@@ -1644,7 +1644,7 @@ namespace
             }
             current.push_back(c);
         }
-        if (!current.empty())
+        if (!current.empty() || !parts.empty())
             parts.push_back(trim(current));
         return parts;
     }
@@ -1825,6 +1825,13 @@ namespace mytoml
                 // Table header
                 auto body = trimmed.substr(1, trimmed.size() - 2);
                 auto parts = split_top_level(body, '.');
+                if (parts.empty())
+                    throw parse_error("empty table name");
+                for (const auto &part : parts)
+                {
+                    if (part.empty())
+                        throw parse_error("empty segment in table name");
+                }
                 ensure_path(root, parts, parts.size(), &current);
                 continue;
             }
@@ -1836,6 +1843,14 @@ namespace mytoml
             auto key_part = trim(trimmed.substr(0, eq));
             auto value_part = trimmed.substr(eq + 1);
             auto keys = split_top_level(key_part, '.');
+
+            if (keys.empty())
+                throw parse_error("empty key in assignment");
+            for (const auto &part : keys)
+            {
+                if (part.empty())
+                    throw parse_error("empty segment in key");
+            }
 
             table_t *target = nullptr;
             if (keys.size() > 1)

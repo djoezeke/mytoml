@@ -27,13 +27,13 @@ cc_library(
 cc_library(
 	name = "mytomlc",
 	srcs = [
-		"src/mytomlc.cpp",
+		"src/mytoml.c",
 	],
 	hdrs = glob(["include/mytoml/*.h", "include/mytoml/*.hpp"]),
     linkstatic = True,
 	visibility = ["//visibility:public"],
 	includes = ["include"],
-	copts = ["-std=c++17"],
+	copts = ["-std=c11"],
 	deps = [":mytoml"],
 )
 

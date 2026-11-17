@@ -1,7 +1,9 @@
-#define CATCH_CONFIG_MAIN
-#include <catch2/catch_all.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <mytoml/mytoml.hpp>
 
-TEST_CASE("Empty C++ Test", "[cxx]")
+TEST_CASE("Library headers are usable", "[cxx][smoke]")
 {
-    REQUIRE(true);
+    const mytoml::toml document = mytoml::toml::parse("answer = 42\n");
+    REQUIRE(document.is_table());
+    CHECK(document.as_table().at("answer").as_integer() == 42);
 }

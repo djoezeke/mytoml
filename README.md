@@ -26,9 +26,10 @@
   - [🤖 Usage](#-usage)
   <!-- - [🤖 Example](#-example) -->
   - [🧪 Testing](#-testing)
-  <!-- - [🧪 Benchmarking](#-benchmarking) -->
-- [📌 Project Roadmap](#-project-roadmap)
-- [ Support](#-support)
+  - [⚡ Benchmarking](#-benchmarking)
+- [📋 Known Limitations](REVIEW.md)
+- [🚧 Improvement Roadmap](IMPROVE.md)
+- [Support](#support)
 - [🔰 Contributing](#-contributing)
   <!-- - [Contributors](#contributors) -->
 - [🙌 Acknowledgments](#-acknowledgments)
@@ -133,15 +134,19 @@ Here is the list you might want to know:
 mytoml/
 ├── CMakeLists.txt
 ├── LICENSE
-├── mytoml.hpp
-├── mytoml.cpp
+├── include/mytoml/
+│   ├── mytoml.h
+│   └── mytoml.hpp
+├── src/
+│   ├── mytoml.c
+│   └── mytoml.cpp
 ├── tests/
-│   ├── test.c
-│   └── test.cpp
+│   ├── c/
+│   ├── cxx/
+│   └── bench/
 └── examples/
-    ├── basic.c
-    ├── basic.cpp
-    └── sample.cpp
+    └── apis/
+        └── Basic.cpp
 ```
 
 </details>
@@ -152,7 +157,7 @@ mytoml/
 
 Please ensure your runtime environment meets the following requirements:
 
-- **C++11** or newer compiler
+- **C++17** or newer compiler
 - **CMake** (for building examples/tests)
 - Optional C++20 modules build requires **CMake 3.28+** and a modules-capable compiler (MSVC 19.34+ or Clang 16+).
 
@@ -173,18 +178,18 @@ Mytoml uses following software, tools and services:
 
 2. **Add to your project:**
 
-   - Copy `mytoml.hpp` and `mytoml.cpp` into your project.
+   - Copy `include/mytoml/mytoml.hpp` and `src/mytoml.cpp` into your project.
    - Or add as a submodule and include in your build.
 
 3. **Include in your code:**
 
    ```cpp
-   #include "mytoml.hpp"
+   #include <mytoml/mytoml.hpp>
    ```
 
 4. **Compile:**
    ```sh
-   g++ my_source.cpp mytoml.cpp -std=c++17 -o main
+   g++ my_source.cpp src/mytoml.cpp -std=c++17 -Iinclude -o main
    ```
 
 To build the C++20 module target, configure CMake with `-DMYTOML_BUILD_MODULE=ON`.
@@ -220,6 +225,237 @@ cmake --build build/modules --target ModuleExample
 > Makefile support is limited
 
 </details> -->
+
+## 🤖 Usage
+
+A complete, compilable example is available in
+[`examples/apis/Basic.cpp`](examples/apis/Basic.cpp). It covers parsing,
+typed access, modification, emission, literals, streams, UTF helpers, and
+error handling.
+
+Build and run it with CMake:
+
+```sh
+cmake -S . -B build -DMYTOML_BUILD_EXAMPLES=ON
+cmake --build build --target Basic
+./build/Basic
+```
+
+`CMAKE_RUNTIME_OUTPUT_DIRECTORY` is set to the top of the build tree, so all
+example executables land directly in `build/`.
+
+### Parse a document
+
+`mytoml::toml::parse()` accepts a complete TOML document as a `std::string`
+and throws `mytoml::parse_error` when the input cannot be parsed.
+
+```cpp
+#include <mytoml/mytoml.hpp>
+
+#include <iostream>
+#include <string>
+
+int main()
+{
+    const std::string text = R"(
+title = "Mytoml"
+enabled = true
+retries = 3
+ratio = 0.75
+tags = ["toml", "cpp"]
+
+[server]
+host = "127.0.0.1"
+port = 8080
+)";
+
+    mytoml::toml config = mytoml::toml::parse(text);
+
+    std::cout << config.as_table().at("title").as_string() << '\n';
+    std::cout << config.as_table().at("server").as_table().at("port").as_integer() << '\n';
+}
+```
+
+### Check types before reading values
+
+Every node exposes `type()` plus `is_table()`, `is_array()`, `is_string()`,
+`is_integer()`, `is_floating()`, and `is_boolean()`. Use these checks when a
+document is untrusted:
+
+```cpp
+const auto &root = config.as_table();
+const auto retries = root.find("retries");
+
+if (retries != root.end() && retries->second.is_integer())
+{
+    std::cout << "retries = " << retries->second.as_integer() << '\n';
+}
+```
+
+The accessors do not convert between types, except `as_floating()`, which also
+accepts an integer node. Calling an accessor for the wrong type throws
+`std::bad_variant_access`.
+
+### Modify and emit
+
+Tables are `std::map<std::string, toml>`, so new values can be inserted
+directly. `dump()` serializes a table as a TOML document:
+
+```cpp
+config.as_table()["enabled"] = false;
+config.as_table()["release"] = "0.1.0";
+
+std::cout << config.dump();
+```
+
+New nested tables can be created with the `table_t` and `array_t` aliases:
+
+```cpp
+mytoml::toml::table_t database;
+database["url"] = "sqlite://demo.db";
+database["pool_size"] = int64_t{4};
+
+config.as_table()["database"] = std::move(database);
+```
+
+### Arrays and inline tables
+
+Arrays and inline tables are parsed recursively and can be nested:
+
+```cpp
+mytoml::toml doc = mytoml::toml::parse(R"(
+tags = ["toml", "cpp", "config"]
+meta = { name = "mytoml", stars = 5 }
+)");
+
+const auto &tags = doc.as_table().at("tags").as_array();
+const auto &meta = doc.as_table().at("meta").as_table();
+
+std::cout << tags.size() << ' ' << meta.at("name").as_string() << '\n';
+```
+
+Emission of an array of inline tables uses the TOML inline-table form:
+
+```cpp
+mytoml::toml::array_t people;
+mytoml::toml::table_t alice;
+alice["name"] = "Alice";
+alice["age"] = int64_t{30};
+people.emplace_back(std::move(alice));
+
+mytoml::toml output{mytoml::toml::table_t{{"people", mytoml::toml{std::move(people)}}}};
+std::cout << output.dump();
+```
+
+### Literal operator
+
+The `_toml` literal parses a string at run time:
+
+```cpp
+using namespace mytoml::literals;
+
+const mytoml::toml config = R"(
+name = "from literal"
+count = 2
+)"_toml;
+```
+
+### Streams
+
+`operator<<` dumps a node, and `operator>>` parses a stream into an existing
+`toml` object:
+
+```cpp
+std::istringstream input("answer = 42\n");
+mytoml::toml config;
+input >> config;
+
+std::cout << config.as_table().at("answer").as_integer() << '\n';
+std::cout << config; // same output as config.dump()
+```
+
+### Error handling
+
+```cpp
+try
+{
+    const mytoml::toml doc = mytoml::toml::parse("key = \"unterminated");
+}
+catch (const mytoml::parse_error &error)
+{
+    std::cerr << "parse error: " << error.what() << '\n';
+}
+catch (const mytoml::exception &error)
+{
+    std::cerr << "mytoml error: " << error.what() << '\n';
+}
+```
+
+> [!IMPORTANT]
+> Mytoml currently implements a line-oriented subset of TOML 1.0. Features
+> such as dates/times, multiline strings, quoted keys, arrays of tables, and
+> inline comments are not supported. Unsupported values may also be accepted
+> as bare strings instead of being rejected. See [REVIEW.md](REVIEW.md) for the
+> full list of limitations before using the library with untrusted input.
+
+### C API status
+
+`include/mytoml/mytoml.h` currently exposes the `MYTOMLC_VERSION_*`
+macros, the `mtEncoding` enum, and the `mtVersion` structure. There are no C
+parsing or emission functions yet; use the C++ API for now. See
+[IMPROVE.md](IMPROVE.md) for the planned C API work.
+
+## 🧪 Testing
+
+The test suite uses [Catch2](https://github.com/catchorg/Catch2) and lives in
+`tests/`. Catch2 is vendored as a submodule under `tests/vendor/Catch2`.
+
+```sh
+# Configure with tests enabled and build the test executables.
+cmake -S . -B build -DMYTOML_BUILD_TESTS=ON
+cmake --build build --target mytoml-cpp-tests mytoml-c-tests
+
+# Run through CTest.
+ctest --test-dir build --output-on-failure
+
+# Or run the C++ tests directly (all Catch2 options are available).
+./build/mytoml-cpp-tests
+./build/mytoml-cpp-tests "[parse]"
+```
+
+The C test target currently verifies the public C header's macros, enum, and
+structure layout only.
+
+## ⚡ Benchmarking
+
+Catch2 micro-benchmarks are built when `MYTOML_BUILD_BENCHMARKS` is enabled.
+The option defaults to the value of `MYTOML_BUILD_TESTS`, and benchmark
+targets are not registered with CTest.
+
+```sh
+cmake -S . -B build -DMYTOML_BUILD_TESTS=ON -DMYTOML_BUILD_BENCHMARKS=ON
+cmake --build build --target mytoml-cpp-benchmarks
+
+./build/mytoml-cpp-benchmarks --benchmark-samples 10
+./build/mytoml-cpp-benchmarks "parse*" --benchmark-samples 20
+```
+
+The benchmarks cover parsing and emitting small, flat, nested, and array-heavy
+documents, table construction and lookups, and UTF-8 decode/encode helpers.
+
+### Meson and Bazel
+
+```sh
+# Meson
+meson setup builddir -Dmytoml_build_tests=true -Dmytoml_build_benchmarks=true
+meson compile -C builddir
+meson test -C builddir
+meson test -C builddir --benchmark
+
+# Bazel
+bazel test //tests:mytoml_test //tests:mytomlc_test
+bazel run //tests:mytoml_benchmarks
+```
 
 ## Support
 
@@ -278,10 +514,9 @@ See the [CONTRIBUTING.md](https://github.com/djoezeke/mytoml/blob/main/.github/C
 
 We would like to express our gratitude to the following projects and individuals whose work made this project possible:
 
-- [**Catch2**](https://github.com/catchorg/Catch2) as a unit-test framework.
+- [**Catch2**](https://github.com/catchorg/Catch2) as a unit-test and micro-benchmark framework.
 - [**Clang**](https://clang.llvm.org) for coding style checks, and static/runtime analysis.
 - [**CMake**](https://cmake.org) for build automation.
-- [**Google Benchmark**](https://github.com/google/benchmark) to implement the benchmarks.
 - [**Material for MkDocs**](https://squidfunk.github.io/mkdocs-material/) for the style of the documentation site
 - [**MkDocs**](https://www.mkdocs.org) for the documentation site.
 - [**Valgrind**](https://valgrind.org) for memory leak check & correct memory management.

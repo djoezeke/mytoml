@@ -68,7 +68,7 @@ mytomlc_dep = mytoml_dep
 if mytoml_build_c_api
 	mytomlc_lib = library(
 		'mytomlc', 
-		'src/mytomlc.cpp',
+		'src/mytoml.c',
 		include_directories : mytoml_include_dirs,
 		link_with : mytoml_lib,
 		install : mytoml_install,

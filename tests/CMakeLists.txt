@@ -36,7 +36,7 @@ if(TARGET Catch2)
 endif()
 
 # Add the Catch2 CMake module path so CTest integration works
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/vendor/Catch2/Cmake")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/vendor/Catch2/extras")
 
 # Include Catch2 helper functions
 include(Catch)
@@ -100,12 +100,45 @@ function(mytoml_add_test target SOURCES DEPENDS)
     catch_discover_tests(${target} WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR})
 endfunction()
 
+# add a new target which contains Catch2 micro-benchmarks. Benchmark targets are
+# intentionally not registered with CTest because they are meant to be run
+# explicitly (and can take several seconds/minutes to complete).
+function(mytoml_add_benchmark target SOURCES DEPENDS)
+
+    source_group("" FILES ${SOURCES})
+
+    add_executable(${target} ${SOURCES})
+
+    target_include_directories(${target} PRIVATE ${MYTOML_INCLUDE_BUILD_DIR})
+
+    set_target_properties(${target} PROPERTIES FOLDER "Benchmarks")
+
+    target_link_libraries(${target} PRIVATE ${DEPENDS} Catch2::Catch2WithMain)
+
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /utf-8)
+    endif()
+endfunction()
+
 #--------------------------------------------------------------------
 # Manually or Recursively add Tests
 #--------------------------------------------------------------------
 
-file(GLOB C_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/c/*.test.cpp")
+file(GLOB C_TEST_SRC CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/c/*.test.cpp")
 mytoml_add_test(mytoml-c-tests "${C_TEST_SRC}" "Mytoml::MytomlC")
 
-file(GLOB CPP_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/cxx/*.test.cpp")
+file(GLOB CPP_TEST_SRC CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/cxx/*.test.cpp")
 mytoml_add_test(mytoml-cpp-tests "${CPP_TEST_SRC}" "Mytoml::Mytoml")
+
+#--------------------------------------------------------------------
+# Benchmark targets (enabled with MYTOML_BUILD_BENCHMARKS=ON)
+#--------------------------------------------------------------------
+
+if(MYTOML_BUILD_BENCHMARKS)
+    file(GLOB BENCHMARK_SRC CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/bench/*.bench.cpp")
+    if(NOT BENCHMARK_SRC)
+        message(WARNING "MYTOML_BUILD_BENCHMARKS is ON but no benchmark sources were found")
+    else()
+        mytoml_add_benchmark(mytoml-cpp-benchmarks "${BENCHMARK_SRC}" "Mytoml::Mytoml")
+    endif()
+endif()

@@ -9,7 +9,7 @@
     {
       "name": "base",
       "hidden": true,
-      "generator": "Ninja",
+      // "generator": "Ninja",
       "installDir": "${sourceDir}/build/install",
       "cacheVariables": {
         "CMAKE_C_EXTENSIONS": "OFF",

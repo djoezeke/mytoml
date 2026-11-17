@@ -18,6 +18,12 @@ option('mytoml_build_tests',
   description: 'Build test suite'
 )
 
+option('mytoml_build_benchmarks',
+  type: 'boolean',
+  value: false,
+  description: 'Build Catch2 micro-benchmarks (requires mytoml_build_tests)'
+)
+
 option('mytoml_build_examples',
   type: 'boolean',
   value: false,

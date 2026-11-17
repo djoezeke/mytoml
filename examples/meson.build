@@ -10,7 +10,9 @@ if mytoml_build_examples
     # C++ Library API Examples #
     #===========================
 
-	mytoml_examples = []
+	mytoml_examples = [
+		'Basic.cpp',
+	]
 
     foreach example : mytoml_examples
 

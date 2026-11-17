@@ -25,7 +25,7 @@ c:
           - "**/*.c"
           - "**/*.h"
           - include/mytoml/mytoml.h
-          - src/mytomlc.cpp
+          - src/mytoml.c
 
 cxx:
   - changed-files:

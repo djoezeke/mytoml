@@ -3,7 +3,7 @@
 # Distributed under the terms of the MIT license.
 # ===================================================================
 
-load("@rules_cc//cc:defs.bzl", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_test")
 
 #===========================
 # C++ Library Tests        #
@@ -11,7 +11,17 @@ load("@rules_cc//cc:defs.bzl", "cc_test")
 
 cc_test(
 	name = "mytoml_test",
-	srcs = ["cxx/Main.test.cpp"],
+	srcs = [
+		"cxx/Api.test.cpp",
+		"cxx/Emit.test.cpp",
+		"cxx/Encoding.test.cpp",
+		"cxx/Errors.test.cpp",
+		"cxx/Main.test.cpp",
+		"cxx/Parse.test.cpp",
+		"cxx/TestSupport.hpp",
+		"cxx/Values.test.cpp",
+		"cxx/Version.test.cpp",
+	],
 	deps = ["//:mytoml", "//tests/vendor/Catch2:catch2_main"],
 )
 
@@ -23,6 +33,18 @@ cc_test(
 	name = "mytomlc_test",
 	srcs = ["c/Main.test.cpp"],
 	deps = ["//:mytomlc", "//tests/vendor/Catch2:catch2_main"],
+)
+
+#===========================
+# C++ Benchmarks           #
+#===========================
+
+# Not a cc_test: benchmarks are meant to be run explicitly and should not
+# slow down `bazel test //...`.
+cc_binary(
+	name = "mytoml_benchmarks",
+	srcs = ["bench/Benchmarks.bench.cpp"],
+	deps = ["//:mytoml", "//tests/vendor/Catch2:catch2_main"],
 )
 
 # ===================================================================

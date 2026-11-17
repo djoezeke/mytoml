@@ -2350,7 +2350,7 @@ namespace mytoml
              *
              * @return The resulting `toml` object deserialized from `string`.
              */
-            MYTOML_INLINE toml MYTOML_QUOTE_OPERATOR(const char *string, size_t size);
+            MYTOML_API toml MYTOML_QUOTE_OPERATOR(const char *string, size_t size);
 
 #if MYTOML_HAS_CHAR8_T
 
@@ -2362,7 +2362,7 @@ namespace mytoml
              *
              * @return The resulting `toml` object deserialized from `string`.
              */
-            MYTOML_INLINE toml MYTOML_QUOTE_OPERATOR(const char8_t *string, size_t size);
+            MYTOML_API toml MYTOML_QUOTE_OPERATOR(const char8_t *string, size_t size);
 
 #endif // MYTOML_HAS_CHAR8_T
 
@@ -2374,7 +2374,7 @@ namespace mytoml
              *
              * @return The resulting `toml` object deserialized from `string`.
              */
-            MYTOML_INLINE toml MYTOML_QUOTE_OPERATOR(const char16_t *string, size_t size);
+            MYTOML_API toml MYTOML_QUOTE_OPERATOR(const char16_t *string, size_t size);
 
             /**
              * @brief Deserializes a `char32_t` array into a `toml` object.
@@ -2384,7 +2384,7 @@ namespace mytoml
              *
              * @return The resulting `toml` object deserialized from `string`.
              */
-            MYTOML_INLINE toml MYTOML_QUOTE_OPERATOR(const char32_t *string, size_t size);
+            MYTOML_API toml MYTOML_QUOTE_OPERATOR(const char32_t *string, size_t size);
 
             MYTOML_CLANG_SUPPRESS_WARNING_POP
 

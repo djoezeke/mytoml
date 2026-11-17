@@ -31,7 +31,7 @@
  *
  * HELP:
  *    - See links below.
- *    - Read top of mytomlc.cpp for more details and comments.
+ *    - Read top of mytoml.c for more details and comments.
  *
  *  Has only had a few tests run, may have issues.
  *
